@@ -1,0 +1,14 @@
+[
+    {
+        "Date": "2026-05-05",
+        "Source": "Bank",
+        "Amount": 100.0,
+        "Type": "income"
+    },
+    {
+        "Date": "2024-08-07",
+        "Source": "Bank",
+        "Amount": 1000.0,
+        "Type": "income"
+    }
+]

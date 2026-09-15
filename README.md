@@ -2,7 +2,7 @@
 
 ### Version 1 Features
 
-1. Add an expense
+1. Add a transaction
 2. View all expenses
 3. Show total spending 
 4. Exit the program
