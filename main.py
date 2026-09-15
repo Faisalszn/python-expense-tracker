@@ -50,9 +50,12 @@ def prompt_date():
 def prompt_source():
     while True:
         source = input("Enter the source of the transaction: ").strip()
-        if source:
+        if not source:
+            print("Source cannot be empty.")
+        elif source.isdigit():
+            print("Source cannot be only numbers. Please enter a valid source.")
+        else:
             return source
-        print("Source cannot be empty.")
 
 
 def prompt_amount():
@@ -133,7 +136,10 @@ def edit_transaction(transactions):
 
     source = input(f"Source [{transaction['Source']}]: ").strip()
     if source:
-        transaction["Source"] = source
+        if source.isdigit():
+            print("Source cannot be only numbers, keeping previous value.")
+        else:
+            transaction["Source"] = source
 
     amount = input(f"Amount [{transaction['Amount']}]: ").strip()
     if amount:
@@ -196,7 +202,7 @@ def main():
         print("\nExpense Tracker\n")
         print("1. Add transaction")
         print("2. View all transactions")
-        print("3. Show total spending")
+        print("3. Show summary")
         print("4. Edit a transaction")
         print("5. Delete a transaction")
         print("6. Exit")
