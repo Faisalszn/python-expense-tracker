@@ -1,39 +1,77 @@
-import json
+import sqlite3
 from datetime import datetime
 
-TRANSACTIONS_FILE = "transactions.json"
+
+def initialize_database():
+    connection = sqlite3.connect("expenses.db")
+    cursor = connection.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        source TEXT NOT NULL,
+        amount REAL NOT NULL CHECK (amount > 0),
+        type TEXT NOT NULL CHECK (type IN ('income', 'expense'))
+    )
+    """)
+    connection.commit()
+    connection.close()
 
 
-def show_summary(transactions):
+def show_summary():
     """Print total income, spending, and balance."""
-    total_income = sum(t['Amount'] for t in transactions if t['Type'] == 'income')
-    total_spending = sum(t['Amount'] for t in transactions if t['Type'] == 'expense')
+    connection = sqlite3.connect("expenses.db")
+    cursor = connection.cursor()
+    cursor.execute("SELECT type, SUM(amount) FROM transactions GROUP BY type")
+    totals = dict(cursor.fetchall())
+    connection.close()
+
+    total_income = totals.get("income", 0.0)
+    total_spending = totals.get("expense", 0.0)
     balance = total_income - total_spending
     print(f"Total income: {total_income:.2f}")
     print(f"Total spending: {total_spending:.2f}")
     print(f"Balance: {balance:.2f}")
 
 
-def save_transactions(transactions):
-    """Persist transactions to disk as JSON."""
-    try:
-        with open(TRANSACTIONS_FILE, "w") as file:
-            json.dump(transactions, file, indent=4)
-    except OSError as e:
-        print(f"Error saving transactions: {e}")
+def get_transactions():
+    connection = sqlite3.connect("expenses.db")
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT id, date, source, amount, type FROM transactions ORDER BY id"
+    )
+    rows = cursor.fetchall()
+    connection.close()
+
+    return rows
 
 
-def view_transactions(transactions):
+def get_transaction_by_id(transaction_id):
+    connection = sqlite3.connect("expenses.db")
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT id, date, source, amount, type FROM transactions WHERE id = ?",
+        (transaction_id,)
+    )
+    row = cursor.fetchone()
+    connection.close()
+
+    return row
+
+
+def view_transactions():
     """Print all transactions, one per block."""
+    transactions = get_transactions()
     if not transactions:
         print("No transactions found.")
         return
 
-    for transaction in transactions:
-        print(f"Date: {transaction['Date']}")
-        print(f"Source: {transaction['Source']}")
-        print(f"Amount: {transaction['Amount']}")
-        print(f"Type: {transaction['Type']}")
+    for transaction_id, date, source, amount, transaction_type in transactions:
+        print(f"ID: {transaction_id}")
+        print(f"Date: {date}")
+        print(f"Source: {source}")
+        print(f"Amount: {amount}")
+        print(f"Type: {transaction_type}")
         print("--------------------")
 
 
@@ -80,122 +118,144 @@ def prompt_type():
         print("Invalid transaction type. Please enter 'income' or 'expense'.")
 
 
-def add_transaction(transactions):
-    """Prompt the user for transaction details and append it to the list."""
+def insert_transaction(transaction):
+    connection = sqlite3.connect("expenses.db")
+    cursor = connection.cursor()
+    cursor.execute(
+        "INSERT INTO transactions (date, source, amount, type) VALUES (?, ?, ?, ?)",
+        (transaction["Date"], transaction["Source"], transaction["Amount"], transaction["Type"])
+    )
+    connection.commit()
+    connection.close()
+
+
+def add_transaction():
     transaction = {
         "Date": prompt_date(),
         "Source": prompt_source(),
         "Amount": prompt_amount(),
         "Type": prompt_type(),
     }
-
-    transactions.append(transaction)
-    save_transactions(transactions)
+    insert_transaction(transaction)
     print("Transaction added successfully.")
 
 
-def select_transaction(transactions):
-    """Display numbered transactions and let the user pick one by index."""
+def select_transaction():
+    """Display transactions and let the user pick one by database id."""
+    transactions = get_transactions()
     if not transactions:
         print("No transactions found.")
         return None
 
-    for i, transaction in enumerate(transactions, start=1):
-        print(f"{i}. {transaction['Date']} | {transaction['Source']} | "
-              f"{transaction['Amount']} | {transaction['Type']}")
+    for transaction_id, date, source, amount, transaction_type in transactions:
+        print(f"{transaction_id}. {date} | {source} | {amount} | {transaction_type}")
 
     while True:
-        choice = input("Enter the number of the transaction (or 0 to cancel): ")
+        choice = input("Enter the id of the transaction (or 0 to cancel): ")
         if choice == "0":
             return None
         try:
-            index = int(choice) - 1
-            if 0 <= index < len(transactions):
-                return index
+            transaction_id = int(choice)
+            if any(row[0] == transaction_id for row in transactions):
+                return transaction_id
             print("Invalid selection. Please try again.")
         except ValueError:
             print("Please enter a valid number.")
 
 
-def edit_transaction(transactions):
+def update_transaction(transaction_id, date, source, amount, transaction_type):
+    connection = sqlite3.connect("expenses.db")
+    cursor = connection.cursor()
+    cursor.execute(
+        "UPDATE transactions SET date = ?, source = ?, amount = ?, type = ? WHERE id = ?",
+        (date, source, amount, transaction_type, transaction_id)
+    )
+    connection.commit()
+    connection.close()
+
+
+def edit_transaction():
     """Let the user edit an existing transaction's fields."""
-    index = select_transaction(transactions)
-    if index is None:
+    transaction_id = select_transaction()
+    if transaction_id is None:
         return
 
-    transaction = transactions[index]
+    row = get_transaction_by_id(transaction_id)
+    if row is None:
+        print("Transaction no longer exists.")
+        return
+
+    _, date, source, amount, transaction_type = row
     print("Leave a field blank to keep its current value.")
 
-    date = input(f"Date [{transaction['Date']}]: ").strip()
-    if date:
+    new_date = input(f"Date [{date}]: ").strip()
+    if new_date:
         try:
-            datetime.strptime(date, "%Y-%m-%d")
-            transaction["Date"] = date
+            datetime.strptime(new_date, "%Y-%m-%d")
+            date = new_date
         except ValueError:
             print("Invalid date format, keeping previous value.")
 
-    source = input(f"Source [{transaction['Source']}]: ").strip()
-    if source:
-        if source.isdigit():
+    new_source = input(f"Source [{source}]: ").strip()
+    if new_source:
+        if new_source.isdigit():
             print("Source cannot be only numbers, keeping previous value.")
         else:
-            transaction["Source"] = source
+            source = new_source
 
-    amount = input(f"Amount [{transaction['Amount']}]: ").strip()
-    if amount:
+    new_amount = input(f"Amount [{amount}]: ").strip()
+    if new_amount:
         try:
-            value = float(amount)
+            value = float(new_amount)
             if value > 0:
-                transaction["Amount"] = value
+                amount = value
             else:
                 print("Amount must be greater than 0, keeping previous value.")
         except ValueError:
             print("Invalid amount, keeping previous value.")
 
-    transaction_type = input(f"Type [{transaction['Type']}]: ").strip().lower()
-    if transaction_type:
-        if transaction_type in ("income", "expense"):
-            transaction["Type"] = transaction_type
+    new_type = input(f"Type [{transaction_type}]: ").strip().lower()
+    if new_type:
+        if new_type in ("income", "expense"):
+            transaction_type = new_type
         else:
             print("Invalid type, keeping previous value.")
 
-    save_transactions(transactions)
+    update_transaction(transaction_id, date, source, amount, transaction_type)
     print("Transaction updated successfully.")
 
 
-def delete_transaction(transactions):
+def delete_transaction_by_id(transaction_id):
+    connection = sqlite3.connect("expenses.db")
+    cursor = connection.cursor()
+    cursor.execute("DELETE FROM transactions WHERE id = ?", (transaction_id,))
+    connection.commit()
+    connection.close()
+
+
+def delete_transaction():
     """Let the user pick and delete an existing transaction."""
-    index = select_transaction(transactions)
-    if index is None:
+    transaction_id = select_transaction()
+    if transaction_id is None:
         return
 
     confirm = input("Are you sure you want to delete this transaction? (y/n): ").strip().lower()
     if confirm == "y":
-        transactions.pop(index)
-        save_transactions(transactions)
+        delete_transaction_by_id(transaction_id)
         print("Transaction deleted successfully.")
     else:
         print("Delete cancelled.")
 
 
-def load_transactions():
-    """Load transactions from disk, returning an empty list on failure."""
-    try:
-        with open(TRANSACTIONS_FILE, "r") as file:
-            return json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-
 def main():
-    transactions = load_transactions()
+    initialize_database()
 
     menu_actions = {
-        "1": lambda: add_transaction(transactions),
-        "2": lambda: view_transactions(transactions),
-        "3": lambda: show_summary(transactions),
-        "4": lambda: edit_transaction(transactions),
-        "5": lambda: delete_transaction(transactions),
+        "1": add_transaction,
+        "2": view_transactions,
+        "3": show_summary,
+        "4": edit_transaction,
+        "5": delete_transaction,
     }
 
     while True:
