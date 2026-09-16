@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <h1>Expense Tracker Dashboard</h1>
+        <p class="dashboard-subtitle">
+    A clear view of your income, spending, and financial balance.
+        </p>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul>
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %} 
+
+   <div class="summary-grid">
+
+    <div class="summary-card">
+        <h2>Total Income</h2>
+        <p>{{ total_income }}</p>
+    </div>
+
+    <div class="summary-card">
+        <h2>Total Spending</h2>
+        <p>{{ total_spending }}</p>
+    </div>
+
+    <div class="summary-card">
+        <h2>Balance</h2>
+        <p>{{ balance }}</p>
+    </div>
+
+</div>
+<div class="dashboard-actions">
+    <a class="btn-primary" href="{{ url_for('add_transaction') }}">
+        Add Transaction
+    </a>
+
+    <a class="btn-secondary" href="{{ url_for('transactions') }}">
+        View Transactions
+    </a>
+</div>
+{% endblock %}
