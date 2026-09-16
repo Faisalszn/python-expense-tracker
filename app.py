@@ -1,12 +1,30 @@
-from flask import Flask, redirect, render_template, request, flash
-from datetime import datetime
+from functools import wraps
 from contextlib import contextmanager
-import sqlite3
+from datetime import datetime
+import os
+
+from flask import (
+    Flask,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+)
+from dotenv import load_dotenv
+import psycopg2
+from psycopg2 import errorcodes
+from werkzeug.security import check_password_hash, generate_password_hash
+
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "dev"  # required for flash messages; use env var in production
+app.secret_key = os.environ.get("SECRET_KEY", "dev")  # set SECRET_KEY in production
 
-DB_PATH = "expenses.db"
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "postgresql://localhost:5432/expense_tracker"
+)
+
 CATEGORIES = (
     "Groceries",
     "Dining",
@@ -20,8 +38,8 @@ CATEGORIES = (
 
 @contextmanager
 def get_connection():
-    """Yield a sqlite3 connection and guarantee it's closed afterward."""
-    connection = sqlite3.connect(DB_PATH)
+    """Yield a psycopg2 connection and guarantee it's closed afterward."""
+    connection = psycopg2.connect(DATABASE_URL)
     try:
         yield connection
     finally:
@@ -30,9 +48,19 @@ def get_connection():
 def initialize_database():
     with get_connection() as connection:
         cursor = connection.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL
+            )
+        """)
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS transactions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 date TEXT NOT NULL,
                 source TEXT NOT NULL,
                 amount REAL NOT NULL CHECK (amount > 0),
@@ -43,31 +71,27 @@ def initialize_database():
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS budgets (
-                category TEXT PRIMARY KEY,
-                monthly_limit REAL NOT NULL CHECK (monthly_limit > 0)
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                category TEXT NOT NULL,
+                monthly_limit REAL NOT NULL CHECK (monthly_limit > 0),
+                PRIMARY KEY (user_id, category)
             )
         """)
+
         connection.commit()
 
-
-def migrate_database():
-    with get_connection() as connection:
-        cursor = connection.cursor()
-
-        cursor.execute("PRAGMA table_info(transactions)")
-        columns = [column[1] for column in cursor.fetchall()]
-
-        if "category" not in columns:
-            cursor.execute(
-                """
-                ALTER TABLE transactions
-                ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'
-                """
-            )
-            connection.commit()
-
 initialize_database()
-migrate_database()
+
+def login_required(view):
+    """Redirect anonymous visitors to the login page before running a view."""
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        if "user_id" not in session:
+            flash("Please log in to continue")
+            return redirect("/login")
+        return view(*args, **kwargs)
+
+    return wrapped_view
 
 def validate_transaction_form(form):
     """Validate submitted form data, returning (data, error) tuple."""
@@ -110,13 +134,106 @@ def validate_transaction_form(form):
         "category": category,
     }, None
 
+def validate_credentials(username, password):
+    """Validate a username/password pair, returning an error message or None."""
+    if not username:
+        return "Username is required"
+    if len(password) < 8:
+        return "Password must be at least 8 characters"
+    return None
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        error = validate_credentials(username, password)
+        if not error and password != confirm_password:
+            error = "Passwords do not match"
+
+        if error:
+            flash(error)
+            return render_template("register.html"), 400
+
+        password_hash = generate_password_hash(password)
+
+        try:
+            with get_connection() as connection:
+                cursor = connection.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO users (username, password_hash)
+                    VALUES (%s, %s)
+                    RETURNING id
+                    """,
+                    (username, password_hash)
+                )
+                user_id = cursor.fetchone()[0]
+                connection.commit()
+        except psycopg2.IntegrityError as e:
+            if e.pgcode == errorcodes.UNIQUE_VIOLATION:
+                flash("Username is already taken")
+            else:
+                flash(f"Database error: {e}")
+            return render_template("register.html"), 400
+        except psycopg2.Error as e:
+            flash(f"Database error: {e}")
+            return render_template("register.html"), 500
+
+        session["user_id"] = user_id
+        session["username"] = username
+        return redirect("/")
+
+    return render_template("register.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        try:
+            with get_connection() as connection:
+                cursor = connection.cursor()
+                cursor.execute(
+                    "SELECT id, password_hash FROM users WHERE username = %s",
+                    (username,)
+                )
+                user = cursor.fetchone()
+        except psycopg2.Error as e:
+            flash(f"Database error: {e}")
+            return render_template("login.html"), 500
+
+        if user is None or not check_password_hash(user[1], password):
+            flash("Invalid username or password")
+            return render_template("login.html"), 400
+
+        session["user_id"] = user[0]
+        session["username"] = username
+        return redirect("/")
+
+    return render_template("login.html")
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect("/login")
+
 
 @app.route("/")
+@login_required
 def home():
-    total_income, total_spending, balance = get_summary()
-    spending_by_category = get_spending_by_category()
-    monthly_spending = get_monthly_spending()
-    budget_status = get_budget_status()
+    user_id = session["user_id"]
+
+    total_income, total_spending, balance = get_summary(user_id)
+    spending_by_category = get_spending_by_category(user_id)
+    monthly_spending = get_monthly_spending(user_id)
+    budget_status = get_budget_status(user_id)
 
     category_labels = [row[0] for row in spending_by_category]
     category_totals = [row[1] for row in spending_by_category]
@@ -139,6 +256,7 @@ def home():
 
 
 @app.route("/transactions")
+@login_required
 def transactions():
     search = request.args.get("search", "").strip()
     category = request.args.get("category", "").strip()
@@ -146,7 +264,7 @@ def transactions():
 
     return render_template(
         "transactions.html",
-        transactions=get_transactions(search, category, transaction_type),
+        transactions=get_transactions(session["user_id"], search, category, transaction_type),
         search=search,
         category=category,
         transaction_type=transaction_type,
@@ -154,83 +272,82 @@ def transactions():
     )
 
 
-def get_summary():
+def get_summary(user_id):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
 
             cursor.execute(
-                "SELECT SUM(amount) FROM transactions WHERE type = 'income'"
+                "SELECT SUM(amount) FROM transactions WHERE type = 'income' AND user_id = %s",
+                (user_id,)
             )
             total_income = cursor.fetchone()[0] or 0
 
             cursor.execute(
-                "SELECT SUM(amount) FROM transactions WHERE type = 'expense'"
+                "SELECT SUM(amount) FROM transactions WHERE type = 'expense' AND user_id = %s",
+                (user_id,)
             )
             total_spending = cursor.fetchone()[0] or 0
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         flash(f"Database error: {e}")
         total_income = total_spending = 0
 
     return total_income, total_spending, total_income - total_spending
 
 
-def get_transactions(search="", category="", transaction_type=""):
+def get_transactions(user_id, search="", category="", transaction_type=""):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
 
-            conditions = []
-            params = []
+            conditions = ["user_id = %s"]
+            params = [user_id]
 
             if search:
-                conditions.append("source LIKE ?")
+                conditions.append("source LIKE %s")
                 params.append(f"%{search}%")
 
             if category:
-                conditions.append("category = ?")
+                conditions.append("category = %s")
                 params.append(category)
 
             if transaction_type:
-                conditions.append("type = ?")
+                conditions.append("type = %s")
                 params.append(transaction_type)
 
-            query = """
-                SELECT id, date, source, amount, type, category
-                FROM transactions
-            """
-
-            if conditions:
-                query += " WHERE " + " AND ".join(conditions)
-
-            query += " ORDER BY id"
+            query = (
+                "SELECT id, date, source, amount, type, category "
+                "FROM transactions "
+                "WHERE " + " AND ".join(conditions) + " ORDER BY id"
+            )
 
             cursor.execute(query, params)
             return cursor.fetchall()
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         flash(f"Database error: {e}")
         return []
 
 
-def get_transaction_by_id(transaction_id):
+def get_transaction_by_id(transaction_id, user_id):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
             cursor.execute(
                 "SELECT id, date, source, amount, type, category "
                 "FROM transactions "
-                "WHERE id = ?",
-                (transaction_id,)
+                "WHERE id = %s AND user_id = %s",
+                (transaction_id, user_id)
             )
             return cursor.fetchone()
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         flash(f"Database error: {e}")
         return None
 
 
 @app.route("/transactions/<int:transaction_id>/edit", methods=["GET", "POST"])
+@login_required
 def edit_transaction(transaction_id):
-    transaction = get_transaction_by_id(transaction_id)
+    transaction = get_transaction_by_id(transaction_id, session["user_id"])
     if transaction is None:
         return "Transaction not found", 404
 
@@ -250,14 +367,14 @@ def edit_transaction(transaction_id):
                 cursor.execute(
                     """
                     UPDATE transactions
-                    SET date = ?, source = ?, amount = ?, type = ?, category = ?
-                    WHERE id = ?
+                    SET date = %s, source = %s, amount = %s, type = %s, category = %s
+                    WHERE id = %s AND user_id = %s
                     """,
-                    (data["date"], data["source"], data["amount"],
-                     data["type"], data["category"], transaction_id)
+                    (data["date"], data["source"], data["amount"], data["type"],
+                     data["category"], transaction_id, session["user_id"])
                 )
                 connection.commit()
-        except sqlite3.Error as e:
+        except psycopg2.Error as e:
             flash(f"Database error: {e}")
             return render_template(
                 "edit.html",
@@ -271,6 +388,7 @@ def edit_transaction(transaction_id):
 
 
 @app.route("/transactions/add", methods=["GET", "POST"])
+@login_required
 def add_transaction():
     if request.method == "POST":
         data, error = validate_transaction_form(request.form)
@@ -283,13 +401,14 @@ def add_transaction():
                 cursor = connection.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO transactions (date, source, amount, type, category)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO transactions (user_id, date, source, amount, type, category)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     """,
-                    (data["date"], data["source"], data["amount"], data["type"], data["category"])
+                    (session["user_id"], data["date"], data["source"],
+                     data["amount"], data["type"], data["category"])
                 )
                 connection.commit()
-        except sqlite3.Error as e:
+        except psycopg2.Error as e:
             flash(f"Database error: {e}")
             return render_template("add.html", categories=CATEGORIES), 500
 
@@ -299,21 +418,24 @@ def add_transaction():
 
 
 @app.route("/transactions/<int:transaction_id>/delete", methods=["POST"])
+@login_required
 def delete_transaction(transaction_id):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
             cursor.execute(
-                "DELETE FROM transactions WHERE id = ?", (transaction_id,)
+                "DELETE FROM transactions WHERE id = %s AND user_id = %s",
+                (transaction_id, session["user_id"])
             )
             connection.commit()
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         flash(f"Database error: {e}")
 
     return redirect("/transactions")
 
 
 @app.route("/budgets", methods=["GET", "POST"])
+@login_required
 def budgets():
     if request.method == "POST":
         category = request.form.get("category", "").strip()
@@ -338,77 +460,88 @@ def budgets():
                 cursor = connection.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO budgets (category, monthly_limit)
-                    VALUES (?, ?)
-                    ON CONFLICT(category) DO UPDATE SET monthly_limit = excluded.monthly_limit
+                    INSERT INTO budgets (user_id, category, monthly_limit)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (user_id, category)
+                    DO UPDATE SET monthly_limit = excluded.monthly_limit
                     """,
-                    (category, monthly_limit)
+                    (session["user_id"], category, monthly_limit)
                 )
                 connection.commit()
-        except sqlite3.Error as e:
+        except psycopg2.Error as e:
             flash(f"Database error: {e}")
 
         return redirect("/budgets")
 
     return render_template(
         "budgets.html",
-        budget_status=get_budget_status(),
+        budget_status=get_budget_status(session["user_id"]),
         categories=CATEGORIES
     )
 
 
 @app.route("/budgets/<category>/delete", methods=["POST"])
+@login_required
 def delete_budget(category):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
-            cursor.execute("DELETE FROM budgets WHERE category = ?", (category,))
+            cursor.execute(
+                "DELETE FROM budgets WHERE category = %s AND user_id = %s",
+                (category, session["user_id"])
+            )
             connection.commit()
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         flash(f"Database error: {e}")
 
     return redirect("/budgets")
 
 
-def get_spending_by_category():
+def get_spending_by_category(user_id):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT category, SUM(amount) AS total
                 FROM transactions
-                WHERE type = 'expense'
+                WHERE type = 'expense' AND user_id = %s
                 GROUP BY category
                 ORDER BY total DESC
-            """)
+                """,
+                (user_id,)
+            )
 
             return cursor.fetchall()
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         flash(f"Database error: {e}")
         return []
 
 
-def get_monthly_spending():
+def get_monthly_spending(user_id):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
 
-            cursor.execute("""
-                SELECT strftime('%Y-%m', date) AS month, SUM(amount) AS total
+            cursor.execute(
+                """
+                SELECT SUBSTRING(date FROM 1 FOR 7) AS month, SUM(amount) AS total
                 FROM transactions
-                WHERE type = 'expense'
+                WHERE type = 'expense' AND user_id = %s
                 GROUP BY month
                 ORDER BY month
-            """)
+                """,
+                (user_id,)
+            )
 
             return cursor.fetchall()
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         flash(f"Database error: {e}")
         return []
 
 
-def get_budget_status():
+def get_budget_status(user_id):
     """Return each budget's monthly limit alongside spending for the current month."""
     current_month = datetime.now().strftime("%Y-%m")
 
@@ -417,7 +550,13 @@ def get_budget_status():
             cursor = connection.cursor()
 
             cursor.execute(
-                "SELECT category, monthly_limit FROM budgets ORDER BY category"
+                """
+                SELECT category, monthly_limit
+                FROM budgets
+                WHERE user_id = %s
+                ORDER BY category
+                """,
+                (user_id,)
             )
             budget_limits = cursor.fetchall()
 
@@ -425,13 +564,15 @@ def get_budget_status():
                 """
                 SELECT category, SUM(amount)
                 FROM transactions
-                WHERE type = 'expense' AND strftime('%Y-%m', date) = ?
+                WHERE type = 'expense'
+                    AND user_id = %s
+                    AND SUBSTRING(date FROM 1 FOR 7) = %s
                 GROUP BY category
                 """,
-                (current_month,)
+                (user_id, current_month)
             )
             spending_by_category = dict(cursor.fetchall())
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         flash(f"Database error: {e}")
         return []
 
@@ -451,3 +592,7 @@ def get_budget_status():
         })
 
     return status
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Log In{% endblock %}
+
+{% block content %}
+
+<div class="form-page">
+
+    <div class="form-heading">
+        <p class="eyebrow">WELCOME BACK</p>
+        <h1>Log In</h1>
+        <p>Log in to view your transactions and budgets.</p>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <ul class="flash-message">
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+
+    <form class="transaction-form" method="POST">
+
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input
+                id="username"
+                type="text"
+                name="username"
+                required
+                autofocus
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input
+                id="password"
+                type="password"
+                name="password"
+                required
+            >
+        </div>
+
+        <div class="form-actions">
+            <button class="form-submit" type="submit">
+                Log In
+            </button>
+
+            <a class="form-cancel" href="{{ url_for('register') }}">
+                Create an account
+            </a>
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}
