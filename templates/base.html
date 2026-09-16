@@ -3,12 +3,32 @@
 <head>
     <title>{% block title %}Expense Tracker{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <link
+        rel="icon"
+        type="image/png"
+        href="{{ url_for('static', filename='images/mizan-icon.png') }}"
+    >
 </head>
 <body>
     <nav>
-        <a href="{{ url_for('home') }}">Dashboard</a>
-        <a href="{{ url_for('transactions') }}">Transactions</a>
-        <a href="{{ url_for('add_transaction') }}">Add Transaction</a>
+        <a class="nav-brand" href="{{ url_for('home') }}">
+            <img
+                src="{{ url_for('static', filename='images/mizan-icon.png') }}"
+                alt="Mizan"
+            >
+
+            <div class="nav-brand-text">
+                <span class="nav-brand-name">MIZAN</span>
+                <span class="nav-brand-subtitle">Personal Finance</span>
+            </div>
+        </a>
+
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}">Dashboard</a>
+            <a href="{{ url_for('transactions') }}">Transactions</a>
+            <a href="{{ url_for('add_transaction') }}">Add Transaction</a>
+        </div>
     </nav>
 
     <main>

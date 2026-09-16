@@ -3,10 +3,12 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-    <h1>Expense Tracker Dashboard</h1>
-        <p class="dashboard-subtitle">
-    A clear view of your income, spending, and financial balance.
-        </p>
+    <h1>Personal Finance Dashboard</h1>
+
+    <p class="dashboard-subtitle">
+        A clear view of your income, spending, and financial balance.
+    </p>
+
     {% with messages = get_flashed_messages() %}
         {% if messages %}
             <ul>
@@ -15,33 +17,83 @@
                 {% endfor %}
             </ul>
         {% endif %}
-    {% endwith %} 
+    {% endwith %}
 
-   <div class="summary-grid">
+    <div class="summary-grid">
+        <div class="summary-card">
+            <h2>Total Income</h2>
+            <p>{{ "%.2f"|format(total_income) }}</p>
+        </div>
 
-    <div class="summary-card">
-        <h2>Total Income</h2>
-        <p>{{ total_income }}</p>
+        <div class="summary-card">
+            <h2>Total Spending</h2>
+            <p>{{ "%.2f"|format(total_spending) }}</p>
+        </div>
+
+        <div class="summary-card">
+            <h2>Balance</h2>
+            <p>{{ "%.2f"|format(balance) }}</p>
+        </div>
     </div>
 
-    <div class="summary-card">
-        <h2>Total Spending</h2>
-        <p>{{ total_spending }}</p>
-    </div>
+    <section class="analytics-section">
+        <div class="analytics-heading">
+            <p class="eyebrow">ANALYTICS</p>
+            <h2>Spending by Category</h2>
+            <p>See how your expenses are distributed across categories.</p>
+        </div>
 
-    <div class="summary-card">
-        <h2>Balance</h2>
-        <p>{{ balance }}</p>
-    </div>
+        {% if spending_by_category %}
+            <div class="spending-section">
+                <div class="chart-card">
+                    <canvas id="spendingChart"></canvas>
+                </div>
 
-</div>
-<div class="dashboard-actions">
-    <a class="btn-primary" href="{{ url_for('add_transaction') }}">
-        Add Transaction
-    </a>
+                <div class="category-panel">
+                    <div class="category-list">
+                        {% for category, total in spending_by_category %}
+                            <div class="category-row">
+                                <span class="category-name">{{ category }}</span>
 
-    <a class="btn-secondary" href="{{ url_for('transactions') }}">
-        View Transactions
-    </a>
-</div>
+                                <span class="category-total">
+                                    {{ "%.2f"|format(total) }}
+                                    <span class="riyal-icon">﷼</span>
+                                </span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <p class="empty-state">No spending recorded yet.</p>
+        {% endif %}
+    </section>
+
+    <section class="monthly-analytics">
+        <div class="analytics-heading">
+            <p class="eyebrow">TREND</p>
+            <h2>Monthly Spending</h2>
+            <p>Track how your total expenses change over time.</p>
+        </div>
+
+        <div class="monthly-chart-card">
+            <canvas id="monthlySpendingChart"></canvas>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        window.spendingData = {
+            labels: {{ category_labels | tojson }},
+            totals: {{ category_totals | tojson }}
+        };
+
+        window.monthlySpendingData = {
+            labels: {{ monthly_labels | tojson }},
+            totals: {{ monthly_totals | tojson }}
+        };
+    </script>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

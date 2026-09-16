@@ -107,12 +107,25 @@ def validate_transaction_form(form):
 @app.route("/")
 def home():
     total_income, total_spending, balance = get_summary()
+    spending_by_category = get_spending_by_category()
+    monthly_spending = get_monthly_spending()
+
+    category_labels = [row[0] for row in spending_by_category]
+    category_totals = [row[1] for row in spending_by_category]
+
+    monthly_labels = [row[0] for row in monthly_spending]
+    monthly_totals = [row[1] for row in monthly_spending]
 
     return render_template(
         "index.html",
         total_income=total_income,
         total_spending=total_spending,
-        balance=balance
+        balance=balance,
+        spending_by_category=spending_by_category,
+        category_labels=category_labels,
+        category_totals=category_totals,
+        monthly_labels=monthly_labels,
+        monthly_totals=monthly_totals
     )
 
 
@@ -289,7 +302,41 @@ def delete_transaction(transaction_id):
         flash(f"Database error: {e}")
 
     return redirect("/transactions")
- 
 
-if __name__ == "__main__":
-    app.run(debug=True)
+
+def get_spending_by_category():
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+
+            cursor.execute("""
+                SELECT category, SUM(amount) AS total
+                FROM transactions
+                WHERE type = 'expense'
+                GROUP BY category
+                ORDER BY total DESC
+            """)
+
+            return cursor.fetchall()
+    except sqlite3.Error as e:
+        flash(f"Database error: {e}")
+        return []
+
+
+def get_monthly_spending():
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+
+            cursor.execute("""
+                SELECT strftime('%Y-%m', date) AS month, SUM(amount) AS total
+                FROM transactions
+                WHERE type = 'expense'
+                GROUP BY month
+                ORDER BY month
+            """)
+
+            return cursor.fetchall()
+    except sqlite3.Error as e:
+        flash(f"Database error: {e}")
+        return []
