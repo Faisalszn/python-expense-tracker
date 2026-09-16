@@ -1279,3 +1279,160 @@ main ul li {
     max-height: 320px;
 }
 
+/* ------------------------------------------------
+   BUDGETS
+------------------------------------------------ */
+
+.budget-section {
+    margin-top: 42px;
+}
+
+.budgets-layout {
+    display: grid;
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+    margin-top: 28px;
+}
+
+.budget-form-card {
+    padding: 24px;
+
+    background: rgba(255, 250, 243, 0.92);
+
+    border: 1px solid var(--border);
+    border-radius: 20px;
+
+    box-shadow: var(--shadow);
+}
+
+.budget-form-card h2 {
+    margin-bottom: 4px;
+    font-size: 20px;
+}
+
+.budget-form {
+    padding: 0;
+    margin-top: 18px;
+    border: none;
+    box-shadow: none;
+    background: none;
+}
+
+.budget-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.budget-card {
+    padding: 20px 22px;
+
+    background: rgba(255, 250, 243, 0.92);
+
+    border: 1px solid var(--border);
+    border-radius: 18px;
+
+    box-shadow: var(--shadow);
+}
+
+.budget-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 14px;
+}
+
+.budget-category {
+    color: var(--brown-dark);
+
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.budget-card-header button {
+    margin: 0;
+
+    padding: 6px 13px;
+
+    background: var(--terracotta);
+
+    font-size: 12px;
+}
+
+.budget-card-header button:hover {
+    background: #894933;
+}
+
+.budget-progress-track {
+    width: 100%;
+    height: 10px;
+
+    overflow: hidden;
+
+    background: var(--surface-soft);
+
+    border-radius: 999px;
+}
+
+.budget-progress-fill {
+    height: 100%;
+
+    background:
+        linear-gradient(
+            90deg,
+            var(--olive),
+            var(--brown-medium)
+        );
+
+    border-radius: 999px;
+
+    transition: width 0.3s ease;
+}
+
+.budget-over .budget-progress-fill {
+    background:
+        linear-gradient(
+            90deg,
+            var(--terracotta),
+            #8a3f2b
+        );
+}
+
+.budget-figures {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-top: 10px;
+
+    color: var(--text);
+
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.budget-warning {
+    margin: 8px 0 0;
+
+    color: #8a3f2b;
+
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.budget-remaining {
+    margin: 8px 0 0;
+
+    color: var(--text-muted);
+
+    font-size: 13px;
+}
+
+@media (max-width: 850px) {
+    .budgets-layout {
+        grid-template-columns: 1fr;
+    }
+}
+

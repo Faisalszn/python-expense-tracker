@@ -184,3 +184,34 @@ Flask
 Jinja
         ↓
 Chart.js Doughnut Chart
+```
+
+## Version 8 – Budgets and Spending Limits
+
+Version 8 introduced budgeting, letting a monthly spending limit be set per category and tracked against real spending.
+
+### New Features
+- Set a monthly spending limit per category
+- View spending progress against each budget on a dedicated Budgets page
+- Show a Budget Status summary on the dashboard
+- Highlight categories that go over their monthly limit
+- Update a budget by resubmitting a limit for the same category
+- Remove a budget
+
+### Backend Improvements
+- Added a `budgets` table keyed by category
+- Used `INSERT ... ON CONFLICT DO UPDATE` to create or update a budget in one query
+- Compared current-month spending (via `strftime('%Y-%m', date)`) against each budget's limit
+- Calculated spent, remaining, and percentage-used for each budget
+
+### Frontend Improvements
+- Added a Budgets page with a form to set limits and a list of progress bars
+- Added a Budget Status section to the dashboard
+- Added progress bar styling with a distinct over-budget state
+- Added a "Budgets" link to the navbar
+
+### What I Learned
+- How to design a table keyed by a natural key instead of an autoincrement id
+- How `INSERT ... ON CONFLICT DO UPDATE` (upsert) avoids separate insert/update logic
+- How to scope an aggregate SQL query to the current calendar month
+- How to turn a ratio into a percentage-based progress bar in the UI
