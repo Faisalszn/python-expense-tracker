@@ -451,3 +451,7 @@ def get_budget_status():
         })
 
     return status
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
