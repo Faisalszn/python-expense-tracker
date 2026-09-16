@@ -25,10 +25,21 @@
         </a>
 
         <div class="nav-links">
-            <a href="{{ url_for('home') }}">Dashboard</a>
-            <a href="{{ url_for('transactions') }}">Transactions</a>
-            <a href="{{ url_for('add_transaction') }}">Add Transaction</a>
-            <a href="{{ url_for('budgets') }}">Budgets</a>
+            {% if session.get('user_id') %}
+                <a href="{{ url_for('home') }}">Dashboard</a>
+                <a href="{{ url_for('transactions') }}">Transactions</a>
+                <a href="{{ url_for('add_transaction') }}">Add Transaction</a>
+                <a href="{{ url_for('budgets') }}">Budgets</a>
+
+                <span class="nav-user">{{ session.get('username') }}</span>
+
+                <form class="nav-logout" action="{{ url_for('logout') }}" method="POST">
+                    <button type="submit">Log Out</button>
+                </form>
+            {% else %}
+                <a href="{{ url_for('login') }}">Log In</a>
+                <a href="{{ url_for('register') }}">Create Account</a>
+            {% endif %}
         </div>
     </nav>
 

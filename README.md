@@ -215,3 +215,51 @@ Version 8 introduced budgeting, letting a monthly spending limit be set per cate
 - How `INSERT ... ON CONFLICT DO UPDATE` (upsert) avoids separate insert/update logic
 - How to scope an aggregate SQL query to the current calendar month
 - How to turn a ratio into a percentage-based progress bar in the UI
+
+## Version 9 – User Accounts and PostgreSQL
+
+Version 9 turned the app from a single shared ledger into a multi-user application, and replaced SQLite with PostgreSQL as the application database.
+
+### New Features
+- Create an account with a username and password
+- Log in and log out
+- Every transaction and budget is scoped to the logged-in user
+- Anonymous visitors are redirected to the login page
+- A user can no longer view, edit, or delete another user's transactions or budgets, even by guessing an id in the URL
+
+### Backend Improvements
+- Replaced `sqlite3` with `psycopg2` and PostgreSQL
+- Added a `users` table storing a username and a hashed password
+- Added a `user_id` foreign key to `transactions` and `budgets`, with `ON DELETE CASCADE`
+- Changed the `budgets` primary key to `(user_id, category)` so each user has independent budgets
+- Hashed passwords with `werkzeug.security.generate_password_hash` / `check_password_hash`
+- Added a `login_required` decorator to protect routes
+- Rewrote every query to filter by the current session's `user_id`
+- Replaced SQLite's `?` placeholders with psycopg2's `%s` placeholders
+- Replaced SQLite's `strftime('%Y-%m', date)` with `SUBSTRING(date FROM 1 FOR 7)`
+- Read database configuration from a `DATABASE_URL` environment variable via `python-dotenv`
+
+### Frontend Improvements
+- Added Login and Create Account pages
+- Made the navbar auth-aware: shows Login/Create Account when signed out, and the username plus a Log Out button when signed in
+
+### What I Learned
+- How to design multi-tenant tables with a foreign key instead of a single shared table
+- Why passwords are hashed instead of stored as plain text, and how `werkzeug.security` does it
+- How Flask sessions keep a logged-in user's id between requests
+- How a Python decorator can guard multiple routes with one piece of reusable logic
+- How SQL dialects differ between SQLite and PostgreSQL (placeholders, date functions, upsert syntax)
+- Why every query needs a `WHERE user_id = ...` check, not just the ones a user is "supposed" to hit — otherwise an id in a URL can expose or modify someone else's data
+- How to keep secrets like `DATABASE_URL` out of source control with a `.env` file and `.env.example`
+
+### Running Locally
+
+```bash
+pip install -r requirements.txt
+
+# create a PostgreSQL database, then set DATABASE_URL
+cp .env.example .env
+# edit .env with your database credentials
+
+python app.py
+```

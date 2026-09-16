@@ -180,6 +180,50 @@ nav {
     width: 100%;
 }
 
+.nav-user {
+    color: #c9a77d;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+
+.nav-logout {
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+}
+
+.nav-logout button {
+    margin: 0;
+
+    padding: 8px 16px;
+
+    border: 1px solid rgba(248, 241, 232, 0.3);
+    border-radius: 999px;
+
+    background: transparent;
+
+    color: #f8f1e8;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.nav-logout button:hover {
+    transform: none;
+    box-shadow: none;
+
+    background: rgba(248, 241, 232, 0.12);
+    border-color: rgba(248, 241, 232, 0.5);
+}
+
 @media (max-width: 700px) {
     nav {
         padding: 12px 20px;
@@ -195,6 +239,10 @@ nav {
 
     .nav-links a {
         font-size: 12px;
+    }
+
+    .nav-user {
+        display: none;
     }
 }
 
