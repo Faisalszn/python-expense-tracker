@@ -74,5 +74,15 @@ Version 4 transformed the expense tracker from a command-line application into a
 
 Browser → Flask Routes → Python Logic → SQLite Database
     
+## V5 — Transaction Categories
 
+✓ category database column
+✓ migration for existing databases
+✓ current schema for fresh databases
+✓ controlled category list
+✓ server-side validation
+✓ category on Add
+✓ category on Edit
+✓ category saved in SQLite
+✓ category shown in Transactions
 
