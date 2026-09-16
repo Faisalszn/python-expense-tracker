@@ -86,3 +86,36 @@ Browser → Flask Routes → Python Logic → SQLite Database
 ✓ category saved in SQLite
 ✓ category shown in Transactions
 
+## Version 6 – Search and Filtering
+
+Version 6 introduced dynamic transaction filtering to make it easier to explore stored financial data.
+
+### New Features
+- Search transactions by source
+- Filter transactions by category
+- Filter transactions by transaction type
+- Combine multiple filters at the same time
+- Clear all active filters
+- Preserve selected filters in the interface
+- Responsive filter controls for desktop and mobile
+
+### Backend Improvements
+- Added GET query parameters using Flask `request.args`
+- Updated transaction queries to support dynamic filtering
+- Built SQL conditions dynamically based on active filters
+- Continued using parameterized SQL queries for safer database access
+
+### What I Learned
+- How GET requests and query parameters work in Flask
+- The difference between `request.args` and `request.form`
+- How to build dynamic SQL queries without duplicating query logic
+- How to combine multiple SQL conditions using `AND`
+- How parameterized queries help prevent SQL injection
+- How frontend filter controls connect to backend query logic
+
+### Example
+
+A filtered request can look like:
+
+```text
+/transactions?search=car&category=Groceries&type=expense

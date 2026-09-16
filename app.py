@@ -118,9 +118,17 @@ def home():
 
 @app.route("/transactions")
 def transactions():
+    search = request.args.get("search", "").strip()
+    category = request.args.get("category", "").strip()
+    transaction_type = request.args.get("type", "").strip()
+
     return render_template(
         "transactions.html",
-        transactions=get_transactions()
+        transactions=get_transactions(search, category, transaction_type),
+        search=search,
+        category=category,
+        transaction_type=transaction_type,
+        categories=CATEGORIES
     )
 
 
@@ -145,15 +153,37 @@ def get_summary():
     return total_income, total_spending, total_income - total_spending
 
 
-def get_transactions():
+def get_transactions(search="", category="", transaction_type=""):
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
-            cursor.execute("""
+
+            conditions = []
+            params = []
+
+            if search:
+                conditions.append("source LIKE ?")
+                params.append(f"%{search}%")
+
+            if category:
+                conditions.append("category = ?")
+                params.append(category)
+
+            if transaction_type:
+                conditions.append("type = ?")
+                params.append(transaction_type)
+
+            query = """
                 SELECT id, date, source, amount, type, category
                 FROM transactions
-                ORDER BY id
-            """)
+            """
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY id"
+
+            cursor.execute(query, params)
             return cursor.fetchall()
     except sqlite3.Error as e:
         flash(f"Database error: {e}")
