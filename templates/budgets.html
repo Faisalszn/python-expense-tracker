@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Budgets{% endblock %}
+
+{% block content %}
+<p class="eyebrow">SPENDING LIMITS</p>
+<h1>Budgets</h1>
+<p class="page-subtitle">
+    Set a monthly spending limit per category and track your progress.
+</p>
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        <ul class="flash-message">
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endwith %}
+
+<div class="budgets-layout">
+    <div class="budget-form-card">
+        <h2>Set a Budget</h2>
+
+        <form method="POST" action="{{ url_for('budgets') }}" class="transaction-form budget-form">
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category" name="category" required>
+                    {% for category in categories %}
+                        <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="monthly_limit">Monthly Limit</label>
+                <input
+                    id="monthly_limit"
+                    type="number"
+                    step="0.01"
+                    name="monthly_limit"
+                    placeholder="0.00"
+                    required
+                >
+            </div>
+
+            <div class="form-actions">
+                <button class="form-submit" type="submit">Save Budget</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="budget-list">
+        {% if budget_status %}
+            {% for budget in budget_status %}
+                <div class="budget-card {% if budget.over_budget %}budget-over{% endif %}">
+                    <div class="budget-card-header">
+                        <span class="budget-category">{{ budget.category }}</span>
+
+                        <form
+                            action="{{ url_for('delete_budget', category=budget.category) }}"
+                            method="POST"
+                        >
+                            <button
+                                type="submit"
+                                onclick="return confirm('Remove this budget?');"
+                            >
+                                Remove
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="budget-progress-track">
+                        <div
+                            class="budget-progress-fill"
+                            style="width: {{ budget.display_percentage }}%;"
+                        ></div>
+                    </div>
+
+                    <div class="budget-figures">
+                        <span>
+                            {{ "%.2f"|format(budget.spent) }}
+                            <span class="riyal-icon">﷼</span> spent
+                        </span>
+
+                        <span>
+                            of {{ "%.2f"|format(budget.limit) }}
+                            <span class="riyal-icon">﷼</span>
+                        </span>
+                    </div>
+
+                    {% if budget.over_budget %}
+                        <p class="budget-warning">
+                            Over budget by {{ "%.2f"|format(budget.spent - budget.limit) }} ﷼
+                        </p>
+                    {% else %}
+                        <p class="budget-remaining">
+                            {{ "%.2f"|format(budget.remaining) }} ﷼ remaining this month
+                        </p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="empty-state">
+                No budgets set yet. Add one to start tracking your spending limits.
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+<p>
+    <a href="{{ url_for('home') }}">Back to dashboard</a>
+</p>
+{% endblock %}

@@ -69,6 +69,60 @@
         {% endif %}
     </section>
 
+    <section class="budget-section">
+        <div class="analytics-heading">
+            <p class="eyebrow">THIS MONTH</p>
+            <h2>Budget Status</h2>
+            <p>Track your spending limits and see what's left to spend.</p>
+        </div>
+
+        {% if budget_status %}
+            <div class="budget-list">
+                {% for budget in budget_status %}
+                    <div class="budget-card {% if budget.over_budget %}budget-over{% endif %}">
+                        <div class="budget-card-header">
+                            <span class="budget-category">{{ budget.category }}</span>
+                        </div>
+
+                        <div class="budget-progress-track">
+                            <div
+                                class="budget-progress-fill"
+                                style="width: {{ budget.display_percentage }}%;"
+                            ></div>
+                        </div>
+
+                        <div class="budget-figures">
+                            <span>
+                                {{ "%.2f"|format(budget.spent) }}
+                                <span class="riyal-icon">﷼</span> spent
+                            </span>
+
+                            <span>
+                                of {{ "%.2f"|format(budget.limit) }}
+                                <span class="riyal-icon">﷼</span>
+                            </span>
+                        </div>
+
+                        {% if budget.over_budget %}
+                            <p class="budget-warning">
+                                Over budget by {{ "%.2f"|format(budget.spent - budget.limit) }} ﷼
+                            </p>
+                        {% else %}
+                            <p class="budget-remaining">
+                                {{ "%.2f"|format(budget.remaining) }} ﷼ remaining this month
+                            </p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="empty-state">
+                No budgets set yet.
+                <a href="{{ url_for('budgets') }}">Set a budget</a> to start tracking spending limits.
+            </p>
+        {% endif %}
+    </section>
+
     <section class="monthly-analytics">
         <div class="analytics-heading">
             <p class="eyebrow">TREND</p>

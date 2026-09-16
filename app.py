@@ -40,6 +40,13 @@ def initialize_database():
                 category TEXT NOT NULL DEFAULT 'Other'
             )
         """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS budgets (
+                category TEXT PRIMARY KEY,
+                monthly_limit REAL NOT NULL CHECK (monthly_limit > 0)
+            )
+        """)
         connection.commit()
 
 
@@ -109,6 +116,7 @@ def home():
     total_income, total_spending, balance = get_summary()
     spending_by_category = get_spending_by_category()
     monthly_spending = get_monthly_spending()
+    budget_status = get_budget_status()
 
     category_labels = [row[0] for row in spending_by_category]
     category_totals = [row[1] for row in spending_by_category]
@@ -125,7 +133,8 @@ def home():
         category_labels=category_labels,
         category_totals=category_totals,
         monthly_labels=monthly_labels,
-        monthly_totals=monthly_totals
+        monthly_totals=monthly_totals,
+        budget_status=budget_status
     )
 
 
@@ -304,6 +313,63 @@ def delete_transaction(transaction_id):
     return redirect("/transactions")
 
 
+@app.route("/budgets", methods=["GET", "POST"])
+def budgets():
+    if request.method == "POST":
+        category = request.form.get("category", "").strip()
+        limit_input = request.form.get("monthly_limit", "").strip()
+
+        if category not in CATEGORIES:
+            flash("Invalid category")
+            return redirect("/budgets")
+
+        try:
+            monthly_limit = float(limit_input)
+        except ValueError:
+            flash("Monthly limit must be a number")
+            return redirect("/budgets")
+
+        if monthly_limit <= 0:
+            flash("Monthly limit must be greater than 0")
+            return redirect("/budgets")
+
+        try:
+            with get_connection() as connection:
+                cursor = connection.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO budgets (category, monthly_limit)
+                    VALUES (?, ?)
+                    ON CONFLICT(category) DO UPDATE SET monthly_limit = excluded.monthly_limit
+                    """,
+                    (category, monthly_limit)
+                )
+                connection.commit()
+        except sqlite3.Error as e:
+            flash(f"Database error: {e}")
+
+        return redirect("/budgets")
+
+    return render_template(
+        "budgets.html",
+        budget_status=get_budget_status(),
+        categories=CATEGORIES
+    )
+
+
+@app.route("/budgets/<category>/delete", methods=["POST"])
+def delete_budget(category):
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute("DELETE FROM budgets WHERE category = ?", (category,))
+            connection.commit()
+    except sqlite3.Error as e:
+        flash(f"Database error: {e}")
+
+    return redirect("/budgets")
+
+
 def get_spending_by_category():
     try:
         with get_connection() as connection:
@@ -340,3 +406,48 @@ def get_monthly_spending():
     except sqlite3.Error as e:
         flash(f"Database error: {e}")
         return []
+
+
+def get_budget_status():
+    """Return each budget's monthly limit alongside spending for the current month."""
+    current_month = datetime.now().strftime("%Y-%m")
+
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+
+            cursor.execute(
+                "SELECT category, monthly_limit FROM budgets ORDER BY category"
+            )
+            budget_limits = cursor.fetchall()
+
+            cursor.execute(
+                """
+                SELECT category, SUM(amount)
+                FROM transactions
+                WHERE type = 'expense' AND strftime('%Y-%m', date) = ?
+                GROUP BY category
+                """,
+                (current_month,)
+            )
+            spending_by_category = dict(cursor.fetchall())
+    except sqlite3.Error as e:
+        flash(f"Database error: {e}")
+        return []
+
+    status = []
+    for category, limit in budget_limits:
+        spent = spending_by_category.get(category, 0)
+        percentage = (spent / limit) * 100
+
+        status.append({
+            "category": category,
+            "limit": limit,
+            "spent": spent,
+            "remaining": limit - spent,
+            "percentage": percentage,
+            "display_percentage": min(percentage, 100),
+            "over_budget": spent > limit,
+        })
+
+    return status
