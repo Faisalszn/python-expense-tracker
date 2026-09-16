@@ -17,6 +17,7 @@
                     <th>Source</th>
                     <th>Amount</th>
                     <th>Type</th>
+                    <th>Category</th>
                     <th>Actions</th>
 
                 </tr>
@@ -36,6 +37,7 @@
                          <span class="type-badge expense-badge">Expense</span>
                             {% endif %}
                         </td>
+                        <td>{{ transaction[5] }}</td>
                       <td>
     <a href="{{ url_for('edit_transaction', transaction_id=transaction[0]) }}">
         Edit

@@ -7,7 +7,16 @@ app = Flask(__name__)
 app.secret_key = "dev"  # required for flash messages; use env var in production
 
 DB_PATH = "expenses.db"
-
+CATEGORIES = (
+    "Groceries",
+    "Dining",
+    "Transport",
+    "Shopping",
+    "Bills",
+    "Entertainment",
+    "Salary",
+    "Other",
+)
 
 @contextmanager
 def get_connection():
@@ -18,13 +27,51 @@ def get_connection():
     finally:
         connection.close()
 
+def initialize_database():
+    with get_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                source TEXT NOT NULL,
+                amount REAL NOT NULL CHECK (amount > 0),
+                type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+                category TEXT NOT NULL DEFAULT 'Other'
+            )
+        """)
+        connection.commit()
+
+
+def migrate_database():
+    with get_connection() as connection:
+        cursor = connection.cursor()
+
+        cursor.execute("PRAGMA table_info(transactions)")
+        columns = [column[1] for column in cursor.fetchall()]
+
+        if "category" not in columns:
+            cursor.execute(
+                """
+                ALTER TABLE transactions
+                ADD COLUMN category TEXT NOT NULL DEFAULT 'Other'
+                """
+            )
+            connection.commit()
+
+initialize_database()
+migrate_database()
 
 def validate_transaction_form(form):
     """Validate submitted form data, returning (data, error) tuple."""
+    category = form.get("category", "").strip()
     date = form.get("date", "").strip()
     source = form.get("source", "").strip()
     amount_input = form.get("amount", "").strip()
     transaction_type = form.get("type", "").strip().lower()
+
+    if category not in CATEGORIES:
+        return None, "Invalid category"
 
     if not date:
         return None, "Date is required"
@@ -53,6 +100,7 @@ def validate_transaction_form(form):
         "source": source,
         "amount": amount,
         "type": transaction_type,
+        "category": category,
     }, None
 
 
@@ -102,7 +150,7 @@ def get_transactions():
         with get_connection() as connection:
             cursor = connection.cursor()
             cursor.execute("""
-                SELECT id, date, source, amount, type
+                SELECT id, date, source, amount, type, category
                 FROM transactions
                 ORDER BY id
             """)
@@ -117,7 +165,9 @@ def get_transaction_by_id(transaction_id):
         with get_connection() as connection:
             cursor = connection.cursor()
             cursor.execute(
-                "SELECT id, date, source, amount, type FROM transactions WHERE id = ?",
+                "SELECT id, date, source, amount, type, category "
+                "FROM transactions "
+                "WHERE id = ?",
                 (transaction_id,)
             )
             return cursor.fetchone()
@@ -136,7 +186,11 @@ def edit_transaction(transaction_id):
         data, error = validate_transaction_form(request.form)
         if error:
             flash(error)
-            return render_template("edit.html", transaction=transaction), 400
+            return render_template(
+                "edit.html",
+                transaction=transaction,
+                categories=CATEGORIES
+            ), 400
 
         try:
             with get_connection() as connection:
@@ -144,20 +198,24 @@ def edit_transaction(transaction_id):
                 cursor.execute(
                     """
                     UPDATE transactions
-                    SET date = ?, source = ?, amount = ?, type = ?
+                    SET date = ?, source = ?, amount = ?, type = ?, category = ?
                     WHERE id = ?
                     """,
                     (data["date"], data["source"], data["amount"],
-                     data["type"], transaction_id)
+                     data["type"], data["category"], transaction_id)
                 )
                 connection.commit()
         except sqlite3.Error as e:
             flash(f"Database error: {e}")
-            return render_template("edit.html", transaction=transaction), 500
+            return render_template(
+                "edit.html",
+                transaction=transaction,
+                categories=CATEGORIES
+            ), 500
 
         return redirect("/transactions")
 
-    return render_template("edit.html", transaction=transaction)
+    return render_template("edit.html", transaction=transaction, categories=CATEGORIES)
 
 
 @app.route("/transactions/add", methods=["GET", "POST"])
@@ -166,26 +224,26 @@ def add_transaction():
         data, error = validate_transaction_form(request.form)
         if error:
             flash(error)
-            return render_template("add.html"), 400
+            return render_template("add.html", categories=CATEGORIES), 400
 
         try:
             with get_connection() as connection:
                 cursor = connection.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO transactions (date, source, amount, type)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO transactions (date, source, amount, type, category)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (data["date"], data["source"], data["amount"], data["type"])
+                    (data["date"], data["source"], data["amount"], data["type"], data["category"])
                 )
                 connection.commit()
         except sqlite3.Error as e:
             flash(f"Database error: {e}")
-            return render_template("add.html"), 500
+            return render_template("add.html", categories=CATEGORIES), 500
 
         return redirect("/")
 
-    return render_template("add.html")
+    return render_template("add.html", categories=CATEGORIES)
 
 
 @app.route("/transactions/<int:transaction_id>/delete", methods=["POST"])
@@ -201,7 +259,7 @@ def delete_transaction(transaction_id):
         flash(f"Database error: {e}")
 
     return redirect("/transactions")
-
+ 
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -59,9 +59,8 @@
         </div>
 
         <div class="form-group">
-            <label for="type">Transaction Type</label>
-
-            <select id="type" name="type">
+            <label for="type">Type</label>
+            <select id="type" name="type" required>
                 <option value="income"
                     {% if transaction[4] == "income" %}selected{% endif %}>
                     Income
@@ -71,6 +70,18 @@
                     {% if transaction[4] == "expense" %}selected{% endif %}>
                     Expense
                 </option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="category">Category</label>
+            <select id="category" name="category" required>
+                {% for category in categories %}
+                    <option value="{{ category }}"
+                        {% if transaction[5] == category %}selected{% endif %}>
+                        {{ category }}
+                    </option>
+                {% endfor %}
             </select>
         </div>
 
