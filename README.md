@@ -119,3 +119,68 @@ A filtered request can look like:
 
 ```text
 /transactions?search=car&category=Groceries&type=expense
+
+
+## Version 7 – Analytics Dashboard and Mizan Branding
+
+Version 7 expanded the project from a transaction management tool into a more complete personal finance dashboard with visual analytics and a stronger product identity.
+
+### New Features
+- Added spending-by-category analytics
+- Added monthly spending trend analysis
+- Added a doughnut chart for category-based spending
+- Added a line chart for monthly spending
+- Added Riyal formatting to financial chart values
+- Introduced the Mizan brand identity
+- Added a branded navbar and favicon
+- Improved the dashboard layout and analytics presentation
+
+### Backend Improvements
+- Added SQL aggregation using `SUM()`
+- Added grouping with `GROUP BY`
+- Added monthly aggregation using SQLite `strftime()`
+- Prepared analytics data in Flask before sending it to the frontend
+- Converted query results into separate label and value lists for chart rendering
+
+### Frontend Improvements
+- Integrated Chart.js for data visualization
+- Added a category spending doughnut chart
+- Added a monthly spending line chart
+- Passed Flask/Jinja data safely into JavaScript using `tojson`
+- Added responsive analytics cards
+- Added Mizan logo assets and visual branding
+
+### Technologies Introduced
+- Chart.js
+- JavaScript data visualization
+- Jinja `tojson`
+- SQL aggregation and grouping
+- SQLite date formatting with `strftime()`
+
+### What I Learned
+- How to aggregate financial data using SQL
+- How `GROUP BY` changes raw database rows into analytical summaries
+- How to aggregate data over time using date fields
+- How Flask can prepare backend data for frontend visualizations
+- How Jinja passes Python data into JavaScript
+- How Chart.js uses labels and datasets to render charts
+- How to separate JavaScript into static files
+- How branding assets are organized and served through Flask's `static` directory
+- How backend data, frontend templates, and JavaScript work together in a full-stack application
+
+### Spending by Category Flow
+
+```text
+SQLite Transactions
+        ↓
+WHERE type = 'expense'
+        ↓
+GROUP BY category
+        ↓
+SUM(amount)
+        ↓
+Flask
+        ↓
+Jinja
+        ↓
+Chart.js Doughnut Chart
