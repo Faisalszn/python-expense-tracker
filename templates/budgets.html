@@ -12,7 +12,7 @@
     <div class="budget-form-card">
         <h2>{{ t('budgets.set_a_budget') }}</h2>
 
-        <form method="POST" action="{{ url_for('budgets') }}" class="transaction-form budget-form">
+        <form method="POST" action="{{ url_for('budgets.index') }}" class="transaction-form budget-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="form-group">
@@ -57,6 +57,6 @@
 </div>
 
 <p>
-    <a href="{{ url_for('home') }}">{{ t('transactions.back_to_dashboard') }}</a>
+    <a href="{{ url_for('dashboard.home') }}">{{ t('transactions.back_to_dashboard') }}</a>
 </p>
 {% endblock %}

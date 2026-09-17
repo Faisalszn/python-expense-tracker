@@ -264,6 +264,20 @@ cp .env.example .env
 python app.py
 ```
 
+### Running Tests
+
+```bash
+pip install -r requirements-dev.txt
+
+# create a SEPARATE database for tests (running them truncates its tables)
+export TEST_DATABASE_URL=postgresql://username:password@localhost:5432/expense_tracker_test
+
+ruff check .
+pytest tests/ -v
+```
+
+CI (`.github/workflows/ci.yml`) runs both of these on every push and pull request, against a PostgreSQL service container.
+
 ## Version 9.5 – Profile, Security Hardening, and Localization
 
 Version 9.5 rounded out the account system from V9 with a real profile page, several industry-standard security defenses, and English/Arabic localization, plus a themed date picker and stricter transaction validation.
@@ -322,3 +336,27 @@ A code review of V9.5 caught several issues worth fixing before treating it as d
 - How to make a schema migration idempotent for a value that already matches, instead of unconditionally re-running an expensive `ALTER COLUMN TYPE` full-table rewrite on every deploy
 - That translating UI chrome is necessary but not sufficient for real localization — the data flowing through that chrome (category names, dates, third-party widgets) needs the same treatment
 - That a convenient default (`SECRET_KEY = "dev"`) is a legitimate developer-experience choice for local development and a legitimate vulnerability if it silently ships to production
+
+## Version 10 – Production Readiness and Architecture
+
+By V9.5 `app.py` had grown to roughly 26 KB and held authentication, database setup/migrations, profile logic, transactions, budgets, analytics, and localization wiring in one module, with no automated tests and no CI. Version 10 is not a user-facing feature: it's the refactor that makes the codebase safe to keep extending, with the priorities set by a code review of the V9.5 branch (tests, real migrations, and CI mattering more at this point than another feature).
+
+### New Features (for contributors, not end users)
+- A real migration system: numbered `.sql` files in `migrations/`, tracked in a `schema_migrations` table, applied at most once per database
+- A pytest suite (55 tests) running against a real PostgreSQL database, covering auth, transactions, budgets, profile actions, and security (CSRF, lockout, cross-user access)
+- GitHub Actions CI: lint (`ruff`) and the full test suite against a Postgres service container, on every push and pull request
+
+### Backend Improvements
+- Split the monolithic `app.py` into Blueprints by feature area: `blueprints/auth.py`, `blueprints/profile.py`, `blueprints/dashboard.py`, `blueprints/transactions.py`, `blueprints/budgets.py`, with shared `constants.py` (categories) and `i18n.py` (the `t()` helper) modules
+- `app.py` is now a ~45-line application factory (`create_app()`) that wires config, CSRF, i18n, blueprints, and (at real startup, not in the factory) migrations together
+- Replaced the hand-rolled `initialize_database()`/`migrate_database()` functions with `db.py`'s `run_migrations()`, which applies any `migrations/*.sql` file not yet recorded in `schema_migrations` — each migration now runs exactly once per database instead of re-checking column types on every app startup
+- Fixed a real regression the refactor introduced and caught with a manual end-to-end pass, not just the test suite: `.env` values were silently not loading, because `db.py`'s module-level `DATABASE_URL` was evaluated (via the blueprint imports) before `app.py` ever called `load_dotenv()`. Fixed by having `db.py` load its own `.env` immediately before reading the variable it needs, instead of relying on import order elsewhere in the app
+- Removed the tracked `expenses.db`/`transactions.json` follow-through: they were already deleted in the previous patch, but `.gitignore` now also excludes `.pytest_cache/` and `.ruff_cache/`
+
+### What I Learned
+- Why "it works" and "it's tested" are different claims — the pytest suite caught nothing new in application logic (everything had already been manually verified), but running the *whole* suite against the *refactored* code is what caught the `.env` loading regression, which manual spot-checks of individual routes had missed
+- Why a real migration tracking table (`schema_migrations`) is simpler than the guard-and-recheck approach from the previous patch, not just "more proper" — once a migration is recorded as applied, it never needs to inspect `information_schema` again
+- How Python's module-level code executes exactly once, at first import, regardless of which import statement triggers it — and why that makes "where do I call `load_dotenv()`" an actual design decision, not a stylistic one
+- How Flask Blueprints namespace endpoints (`auth.login`, not `login`), and why every `url_for()` call in every template had to be updated in lockstep with the backend split
+- Why CI needs a real database service container, not a mock, for an app whose bugs (so far) have consistently been at the SQL/type boundary
+- That splitting a file is easy; splitting it *correctly* — deciding which module owns `get_budget_status()` when both the dashboard and the budgets page need it — is the actual design work

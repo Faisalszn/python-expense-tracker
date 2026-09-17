@@ -75,7 +75,7 @@
         {% else %}
             <p class="empty-state">
                 {{ t('dashboard.no_budgets') }}
-                <a href="{{ url_for('budgets') }}">{{ t('dashboard.set_budget_link') }}</a>
+                <a href="{{ url_for('budgets.index') }}">{{ t('dashboard.set_budget_link') }}</a>
                 {{ t('dashboard.set_budget_suffix') }}
             </p>
         {% endif %}

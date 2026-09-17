@@ -5,7 +5,7 @@
 
         {% if show_remove %}
             <form
-                action="{{ url_for('delete_budget', category=budget.category) }}"
+                action="{{ url_for('budgets.delete', category=budget.category) }}"
                 method="POST"
             >
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

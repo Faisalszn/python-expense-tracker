@@ -8,7 +8,7 @@
     {{ t('transactions.subtitle') }}
 </p>
 
-<form method="GET" action="{{ url_for('transactions') }}" class="filter-form">
+<form method="GET" action="{{ url_for('transactions.index') }}" class="filter-form">
 
     <input
         type="text"
@@ -44,7 +44,7 @@
 
     <button type="submit">{{ t('transactions.apply_filters') }}</button>
 
-    <a href="{{ url_for('transactions') }}">
+    <a href="{{ url_for('transactions.index') }}">
         {{ t('transactions.clear') }}
     </a>
 
@@ -81,12 +81,12 @@
                     </td>
                     <td>{{ t('category.' ~ transaction[5]) }}</td>
                     <td>
-                        <a href="{{ url_for('edit_transaction', transaction_id=transaction[0]) }}">
+                        <a href="{{ url_for('transactions.edit', transaction_id=transaction[0]) }}">
                             {{ t('transactions.edit') }}
                         </a>
 
                         <form
-                            action="{{ url_for('delete_transaction', transaction_id=transaction[0]) }}"
+                            action="{{ url_for('transactions.delete', transaction_id=transaction[0]) }}"
                             method="POST"
                             style="display:inline;"
                         >
@@ -109,6 +109,6 @@
 {% endif %}
 
 <p>
-    <a href="{{ url_for('home') }}">{{ t('transactions.back_to_dashboard') }}</a>
+    <a href="{{ url_for('dashboard.home') }}">{{ t('transactions.back_to_dashboard') }}</a>
 </p>
 {% endblock %}

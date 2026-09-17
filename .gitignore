@@ -5,3 +5,5 @@ __pycache__/
 .env
 transactions.json
 expenses.db
+.pytest_cache/
+.ruff_cache/

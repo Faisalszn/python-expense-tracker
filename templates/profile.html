@@ -24,12 +24,12 @@
         <h2>{{ t('profile.language_heading') }}</h2>
         <p>{{ t('profile.language_desc') }}</p>
 
-        <form method="POST" action="{{ url_for('set_language', lang='en') }}" class="profile-inline-form">
+        <form method="POST" action="{{ url_for('profile.set_language', lang='en') }}" class="profile-inline-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn-secondary {{ 'btn-primary' if lang == 'en' }}">English</button>
         </form>
 
-        <form method="POST" action="{{ url_for('set_language', lang='ar') }}" class="profile-inline-form">
+        <form method="POST" action="{{ url_for('profile.set_language', lang='ar') }}" class="profile-inline-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn-secondary {{ 'btn-primary' if lang == 'ar' }}">العربية</button>
         </form>
@@ -38,7 +38,7 @@
     <div class="profile-card">
         <h2>{{ t('profile.password_heading') }}</h2>
 
-        <form method="POST" action="{{ url_for('change_password') }}" class="transaction-form profile-form">
+        <form method="POST" action="{{ url_for('profile.change_password') }}" class="transaction-form profile-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="form-group">
@@ -66,7 +66,7 @@
         <h2>{{ t('profile.danger_heading') }}</h2>
         <p>{{ t('profile.danger_desc') }}</p>
 
-        <form method="POST" action="{{ url_for('delete_account') }}" class="transaction-form profile-form"
+        <form method="POST" action="{{ url_for('profile.delete_account') }}" class="transaction-form profile-form"
             onsubmit="return confirm('{{ t('profile.delete_confirm') }}');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
