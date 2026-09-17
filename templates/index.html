@@ -43,7 +43,7 @@
                     <div class="category-list">
                         {% for category, total in spending_by_category %}
                             <div class="category-row">
-                                <span class="category-name">{{ category }}</span>
+                                <span class="category-name">{{ t('category.' ~ category) }}</span>
 
                                 <span class="category-total">
                                     {{ "%.2f"|format(total) }}

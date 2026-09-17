@@ -1,6 +1,7 @@
 from functools import wraps
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from math import ceil
 import os
 
@@ -24,6 +25,11 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev")  # set SECRET_KEY in production
+
+if os.environ.get("FLASK_ENV") == "production" and app.secret_key == "dev":
+    raise RuntimeError(
+        "SECRET_KEY must be set via environment variable when FLASK_ENV=production"
+    )
 
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
@@ -77,9 +83,9 @@ def initialize_database():
             CREATE TABLE IF NOT EXISTS transactions (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                date TEXT NOT NULL,
+                date DATE NOT NULL,
                 source TEXT NOT NULL,
-                amount REAL NOT NULL CHECK (amount > 0),
+                amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
                 type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
                 category TEXT NOT NULL DEFAULT 'Other'
             )
@@ -89,12 +95,26 @@ def initialize_database():
             CREATE TABLE IF NOT EXISTS budgets (
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 category TEXT NOT NULL,
-                monthly_limit REAL NOT NULL CHECK (monthly_limit > 0),
+                monthly_limit NUMERIC(12, 2) NOT NULL CHECK (monthly_limit > 0),
                 PRIMARY KEY (user_id, category)
             )
         """)
 
         connection.commit()
+
+def _migrate_column_type(cursor, table, column, expected_data_type, alter_clause):
+    """Change a column's type only if it doesn't already match, so repeated
+    app startups don't rewrite the whole table every time."""
+    cursor.execute(
+        """
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = %s AND column_name = %s
+        """,
+        (table, column)
+    )
+    row = cursor.fetchone()
+    if row and row[0] != expected_data_type:
+        cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE {alter_clause}")
 
 def migrate_database():
     with get_connection() as connection:
@@ -113,6 +133,20 @@ def migrate_database():
         )
         cursor.execute(
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP"
+        )
+
+        # Older databases created before money/dates had proper types.
+        _migrate_column_type(
+            cursor, "transactions", "amount", "numeric",
+            "NUMERIC(12, 2) USING amount::numeric(12, 2)"
+        )
+        _migrate_column_type(
+            cursor, "budgets", "monthly_limit", "numeric",
+            "NUMERIC(12, 2) USING monthly_limit::numeric(12, 2)"
+        )
+        _migrate_column_type(
+            cursor, "transactions", "date", "date",
+            "DATE USING date::date"
         )
 
         connection.commit()
@@ -168,8 +202,10 @@ def validate_transaction_form(form):
         return None, "error.source_numeric"
 
     try:
-        amount = float(amount_input)
-    except ValueError:
+        amount = Decimal(amount_input)
+    except InvalidOperation:
+        return None, "error.amount_not_number"
+    if not amount.is_finite():
         return None, "error.amount_not_number"
     if amount <= 0:
         return None, "error.amount_not_positive"
@@ -474,11 +510,13 @@ def home():
     monthly_spending = get_monthly_spending(user_id)
     budget_status = get_budget_status(user_id)
 
-    category_labels = [row[0] for row in spending_by_category]
-    category_totals = [row[1] for row in spending_by_category]
+    # Converted to float here only: Chart.js/tojson need plain JSON numbers,
+    # while the Decimal values are kept everywhere else so money math stays exact.
+    category_labels = [t("category." + row[0]) for row in spending_by_category]
+    category_totals = [float(row[1]) for row in spending_by_category]
 
     monthly_labels = [row[0] for row in monthly_spending]
-    monthly_totals = [row[1] for row in monthly_spending]
+    monthly_totals = [float(row[1]) for row in monthly_spending]
 
     return render_template(
         "index.html",
@@ -685,8 +723,12 @@ def budgets():
             return redirect("/budgets")
 
         try:
-            monthly_limit = float(limit_input)
-        except ValueError:
+            monthly_limit = Decimal(limit_input)
+        except InvalidOperation:
+            flash(t("error.monthly_limit_not_number"))
+            return redirect("/budgets")
+
+        if not monthly_limit.is_finite():
             flash(t("error.monthly_limit_not_number"))
             return redirect("/budgets")
 
@@ -765,7 +807,7 @@ def get_monthly_spending(user_id):
 
             cursor.execute(
                 """
-                SELECT SUBSTRING(date FROM 1 FOR 7) AS month, SUM(amount) AS total
+                SELECT TO_CHAR(date, 'YYYY-MM') AS month, SUM(amount) AS total
                 FROM transactions
                 WHERE type = 'expense' AND user_id = %s
                 GROUP BY month
@@ -805,7 +847,7 @@ def get_budget_status(user_id):
                 FROM transactions
                 WHERE type = 'expense'
                     AND user_id = %s
-                    AND SUBSTRING(date FROM 1 FOR 7) = %s
+                    AND TO_CHAR(date, 'YYYY-MM') = %s
                 GROUP BY category
                 """,
                 (user_id, current_month)

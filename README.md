@@ -119,7 +119,7 @@ A filtered request can look like:
 
 ```text
 /transactions?search=car&category=Groceries&type=expense
-
+```
 
 ## Version 7 – Analytics Dashboard and Mizan Branding
 
@@ -303,3 +303,22 @@ Phone/SMS and email-based sign-in or password reset both need a paid third-party
 - Why `dir="rtl"` alone isn't enough for a real right-to-left experience — spacing, borders, and flex/flow direction all need explicit overrides
 - That "looks stylable" and "is stylable" are different for native form controls — the native date picker can't be recolored, which is why a themed replacement (flatpickr) exists
 - That deferring a feature (phone/email/passkey login) is sometimes the more honest engineering choice than shipping a fake or broken version of it
+
+### Patch: Data Integrity and Localization Fixes
+
+A code review of V9.5 caught several issues worth fixing before treating it as done, in roughly this priority order:
+
+- **Money was stored as `REAL`.** Floating-point columns can silently misrepresent currency values. Changed `transactions.amount` and `budgets.monthly_limit` to `NUMERIC(12, 2)`, switched all amount parsing from `float()` to `Decimal()` (rejecting non-finite values like `NaN`/`Infinity`, which `Decimal` — unlike `float` — accepts as valid input by default), and converted to `float` only at the one place that actually needs it: building JSON for Chart.js.
+- **Dates were stored as `TEXT`.** Changed `transactions.date` to a native `DATE` column and replaced the `SUBSTRING(date FROM 1 FOR 7)` month-grouping hack with `TO_CHAR(date, 'YYYY-MM')`.
+- **Migrating existing data safely.** Both changes ship as a migration (`ALTER COLUMN ... TYPE ... USING ...`) guarded by a check against `information_schema.columns`, so it upgrades an existing V9/V9.5 database once and doesn't rewrite the table on every subsequent app startup.
+- **Old data files were still committed.** Removed the tracked `expenses.db` and `transactions.json` (both are runtime artifacts of the CLI tool/early versions, not source) and fixed a `.gitignore` typo (`expense.db` → `expenses.db`) that had left the real file untracked-but-not-ignored.
+- **Arabic localization was incomplete.** Category names (`Groceries`, `Dining`, etc.), the "member since" month name on the Profile page, and flatpickr's calendar were all still English-only regardless of the selected language. Added `category.*` and `month.*` translation keys, and flatpickr now loads its Arabic locale file when Arabic is selected.
+- **`SECRET_KEY` had a silent insecure fallback.** The app now refuses to start if `FLASK_ENV=production` and `SECRET_KEY` is still unset (or left as the `"dev"` default), instead of quietly running with a guessable session-signing key.
+- **A broken Markdown fence in this README.** The Version 6 section opened a ` ```text ` block that was never closed, which caused GitHub to render the entire Version 7 section as literal preformatted text.
+
+### What I Learned (Patch)
+- Why `NUMERIC`/`Decimal` — not `REAL`/`float` — is the correct choice for money, and why `Decimal` needs its own non-finite check (`NaN`/`Infinity` are valid `Decimal` values, and PostgreSQL's `NUMERIC` type sorts `NaN` as greater than any other value, so a naive `> 0` check does not reject it)
+- Where it's correct to convert exact values to `float`: only at a system boundary that genuinely can't consume anything else (Chart.js/JSON), never in the storage or business-logic layer
+- How to make a schema migration idempotent for a value that already matches, instead of unconditionally re-running an expensive `ALTER COLUMN TYPE` full-table rewrite on every deploy
+- That translating UI chrome is necessary but not sufficient for real localization — the data flowing through that chrome (category names, dates, third-party widgets) needs the same treatment
+- That a convenient default (`SECRET_KEY = "dev"`) is a legitimate developer-experience choice for local development and a legitimate vulnerability if it silently ships to production

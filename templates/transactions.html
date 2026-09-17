@@ -25,7 +25,7 @@
                 value="{{ item }}"
                 {% if category == item %}selected{% endif %}
             >
-                {{ item }}
+                {{ t('category.' ~ item) }}
             </option>
         {% endfor %}
     </select>
@@ -79,7 +79,7 @@
                             <span class="type-badge expense-badge">{{ t('transactions.expense') }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ transaction[5] }}</td>
+                    <td>{{ t('category.' ~ transaction[5]) }}</td>
                     <td>
                         <a href="{{ url_for('edit_transaction', transaction_id=transaction[0]) }}">
                             {{ t('transactions.edit') }}

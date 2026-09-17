@@ -14,7 +14,8 @@
         <h2>{{ username }}</h2>
         {% if member_since %}
             <p class="profile-meta">
-                {{ t('profile.member_since') }} {{ member_since.strftime('%B %d, %Y') }}
+                {{ t('profile.member_since') }}
+                {{ member_since.day }} {{ t('month.' ~ member_since.month) }} {{ member_since.year }}
             </p>
         {% endif %}
     </div>
