@@ -158,7 +158,10 @@ def register():
             flash(error)
             return render_template("register.html"), 400
 
-        password_hash = generate_password_hash(password)
+        # pbkdf2 avoids relying on hashlib.scrypt, which isn't available on
+        # Python builds linked against LibreSSL instead of OpenSSL (e.g. macOS's
+        # system Python).
+        password_hash = generate_password_hash(password, method="pbkdf2:sha256")
 
         try:
             with get_connection() as connection:
