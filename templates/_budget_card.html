@@ -1,11 +1,11 @@
 {# Expects `budget` (dict from get_budget_status) and optional `show_remove`. #}
 <div class="budget-card {% if budget.over_budget %}budget-over{% endif %}">
     <div class="budget-card-header">
-        <span class="budget-category">{{ budget.category }}</span>
+        <span class="budget-category">{{ t('category.' ~ budget.category) }}</span>
 
         {% if show_remove %}
             <form
-                action="{{ url_for('delete_budget', category=budget.category) }}"
+                action="{{ url_for('budgets.delete', category=budget.category) }}"
                 method="POST"
             >
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

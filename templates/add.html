@@ -67,7 +67,7 @@
     <select id="category" name="category" required>
         {% for category in categories %}
             <option value="{{ category }}">
-                {{ category }}
+                {{ t('category.' ~ category) }}
             </option>
         {% endfor %}
              </select>
@@ -77,7 +77,7 @@
                 {{ t('add.submit') }}
             </button>
 
-            <a class="form-cancel" href="{{ url_for('home') }}">
+            <a class="form-cancel" href="{{ url_for('dashboard.home') }}">
                 {{ t('form.cancel') }}
             </a>
         </div>
@@ -87,8 +87,15 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+{% if lang == 'ar' %}
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ar.js"></script>
+{% endif %}
 <script>
-    flatpickr("#date", { dateFormat: "Y-m-d", allowInput: true });
+    flatpickr("#date", {
+        dateFormat: "Y-m-d",
+        allowInput: true,
+        locale: "{{ lang if lang == 'ar' else 'default' }}"
+    });
 </script>
 
 {% endblock %}

@@ -14,7 +14,7 @@
 </head>
 <body>
     <nav>
-        <a class="nav-brand" href="{{ url_for('home') }}">
+        <a class="nav-brand" href="{{ url_for('dashboard.home') }}">
             <img
                 src="{{ url_for('static', filename='images/mizan-icon.png') }}"
                 alt="{{ t('brand.name') }}"
@@ -28,30 +28,30 @@
 
         <div class="nav-links">
             {% if session.get('user_id') %}
-                <a href="{{ url_for('home') }}">{{ t('nav.dashboard') }}</a>
-                <a href="{{ url_for('transactions') }}">{{ t('nav.transactions') }}</a>
-                <a href="{{ url_for('add_transaction') }}">{{ t('nav.add_transaction') }}</a>
-                <a href="{{ url_for('budgets') }}">{{ t('nav.budgets') }}</a>
-                <a href="{{ url_for('profile') }}">{{ t('nav.profile') }}</a>
+                <a href="{{ url_for('dashboard.home') }}">{{ t('nav.dashboard') }}</a>
+                <a href="{{ url_for('transactions.index') }}">{{ t('nav.transactions') }}</a>
+                <a href="{{ url_for('transactions.add') }}">{{ t('nav.add_transaction') }}</a>
+                <a href="{{ url_for('budgets.index') }}">{{ t('nav.budgets') }}</a>
+                <a href="{{ url_for('profile.profile') }}">{{ t('nav.profile') }}</a>
 
                 <span class="nav-user">{{ session.get('username') }}</span>
 
-                <form class="nav-logout" action="{{ url_for('logout') }}" method="POST">
+                <form class="nav-logout" action="{{ url_for('auth.logout') }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit">{{ t('nav.logout') }}</button>
                 </form>
             {% else %}
-                <a href="{{ url_for('login') }}">{{ t('nav.login') }}</a>
-                <a href="{{ url_for('register') }}">{{ t('nav.register') }}</a>
+                <a href="{{ url_for('auth.login') }}">{{ t('nav.login') }}</a>
+                <a href="{{ url_for('auth.register') }}">{{ t('nav.register') }}</a>
             {% endif %}
 
             <div class="nav-lang-switch">
-                <form action="{{ url_for('set_language', lang='en') }}" method="POST">
+                <form action="{{ url_for('profile.set_language', lang='en') }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="{{ 'nav-lang-active' if lang == 'en' }}">EN</button>
                 </form>
 
-                <form action="{{ url_for('set_language', lang='ar') }}" method="POST">
+                <form action="{{ url_for('profile.set_language', lang='ar') }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="{{ 'nav-lang-active' if lang == 'ar' }}">AR</button>
                 </form>

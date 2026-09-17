@@ -1,0 +1,15 @@
+[tool.ruff]
+extend-exclude = ["main.py"]
+line-length = 100
+
+[tool.ruff.lint]
+# Pycodestyle errors, Pyflakes, and import sorting. Not flake8-datetimez
+# (DTZ): this project intentionally uses naive datetimes throughout to match
+# PostgreSQL's `TIMESTAMP WITHOUT TIME ZONE` columns; adopting tz-aware
+# datetimes would be a real behavior change, not a lint fix.
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Long lines here are one Arabic UI sentence each; wrapping them mid-string
+# hurts translator readability for no real benefit.
+"translations.py" = ["E501"]

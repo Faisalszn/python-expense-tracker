@@ -43,7 +43,7 @@
                     <div class="category-list">
                         {% for category, total in spending_by_category %}
                             <div class="category-row">
-                                <span class="category-name">{{ category }}</span>
+                                <span class="category-name">{{ t('category.' ~ category) }}</span>
 
                                 <span class="category-total">
                                     {{ "%.2f"|format(total) }}
@@ -75,7 +75,7 @@
         {% else %}
             <p class="empty-state">
                 {{ t('dashboard.no_budgets') }}
-                <a href="{{ url_for('budgets') }}">{{ t('dashboard.set_budget_link') }}</a>
+                <a href="{{ url_for('budgets.index') }}">{{ t('dashboard.set_budget_link') }}</a>
                 {{ t('dashboard.set_budget_suffix') }}
             </p>
         {% endif %}

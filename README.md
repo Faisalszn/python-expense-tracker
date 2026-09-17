@@ -119,7 +119,7 @@ A filtered request can look like:
 
 ```text
 /transactions?search=car&category=Groceries&type=expense
-
+```
 
 ## Version 7 – Analytics Dashboard and Mizan Branding
 
@@ -264,6 +264,20 @@ cp .env.example .env
 python app.py
 ```
 
+### Running Tests
+
+```bash
+pip install -r requirements-dev.txt
+
+# create a SEPARATE database for tests (running them truncates its tables)
+export TEST_DATABASE_URL=postgresql://username:password@localhost:5432/expense_tracker_test
+
+ruff check .
+pytest tests/ -v
+```
+
+CI (`.github/workflows/ci.yml`) runs both of these on every push and pull request, against a PostgreSQL service container.
+
 ## Version 9.5 – Profile, Security Hardening, and Localization
 
 Version 9.5 rounded out the account system from V9 with a real profile page, several industry-standard security defenses, and English/Arabic localization, plus a themed date picker and stricter transaction validation.
@@ -303,3 +317,46 @@ Phone/SMS and email-based sign-in or password reset both need a paid third-party
 - Why `dir="rtl"` alone isn't enough for a real right-to-left experience — spacing, borders, and flex/flow direction all need explicit overrides
 - That "looks stylable" and "is stylable" are different for native form controls — the native date picker can't be recolored, which is why a themed replacement (flatpickr) exists
 - That deferring a feature (phone/email/passkey login) is sometimes the more honest engineering choice than shipping a fake or broken version of it
+
+### Patch: Data Integrity and Localization Fixes
+
+A code review of V9.5 caught several issues worth fixing before treating it as done, in roughly this priority order:
+
+- **Money was stored as `REAL`.** Floating-point columns can silently misrepresent currency values. Changed `transactions.amount` and `budgets.monthly_limit` to `NUMERIC(12, 2)`, switched all amount parsing from `float()` to `Decimal()` (rejecting non-finite values like `NaN`/`Infinity`, which `Decimal` — unlike `float` — accepts as valid input by default), and converted to `float` only at the one place that actually needs it: building JSON for Chart.js.
+- **Dates were stored as `TEXT`.** Changed `transactions.date` to a native `DATE` column and replaced the `SUBSTRING(date FROM 1 FOR 7)` month-grouping hack with `TO_CHAR(date, 'YYYY-MM')`.
+- **Migrating existing data safely.** Both changes ship as a migration (`ALTER COLUMN ... TYPE ... USING ...`) guarded by a check against `information_schema.columns`, so it upgrades an existing V9/V9.5 database once and doesn't rewrite the table on every subsequent app startup.
+- **Old data files were still committed.** Removed the tracked `expenses.db` and `transactions.json` (both are runtime artifacts of the CLI tool/early versions, not source) and fixed a `.gitignore` typo (`expense.db` → `expenses.db`) that had left the real file untracked-but-not-ignored.
+- **Arabic localization was incomplete.** Category names (`Groceries`, `Dining`, etc.), the "member since" month name on the Profile page, and flatpickr's calendar were all still English-only regardless of the selected language. Added `category.*` and `month.*` translation keys, and flatpickr now loads its Arabic locale file when Arabic is selected.
+- **`SECRET_KEY` had a silent insecure fallback.** The app now refuses to start if `FLASK_ENV=production` and `SECRET_KEY` is still unset (or left as the `"dev"` default), instead of quietly running with a guessable session-signing key.
+- **A broken Markdown fence in this README.** The Version 6 section opened a ` ```text ` block that was never closed, which caused GitHub to render the entire Version 7 section as literal preformatted text.
+
+### What I Learned (Patch)
+- Why `NUMERIC`/`Decimal` — not `REAL`/`float` — is the correct choice for money, and why `Decimal` needs its own non-finite check (`NaN`/`Infinity` are valid `Decimal` values, and PostgreSQL's `NUMERIC` type sorts `NaN` as greater than any other value, so a naive `> 0` check does not reject it)
+- Where it's correct to convert exact values to `float`: only at a system boundary that genuinely can't consume anything else (Chart.js/JSON), never in the storage or business-logic layer
+- How to make a schema migration idempotent for a value that already matches, instead of unconditionally re-running an expensive `ALTER COLUMN TYPE` full-table rewrite on every deploy
+- That translating UI chrome is necessary but not sufficient for real localization — the data flowing through that chrome (category names, dates, third-party widgets) needs the same treatment
+- That a convenient default (`SECRET_KEY = "dev"`) is a legitimate developer-experience choice for local development and a legitimate vulnerability if it silently ships to production
+
+## Version 10 – Production Readiness and Architecture
+
+By V9.5 `app.py` had grown to roughly 26 KB and held authentication, database setup/migrations, profile logic, transactions, budgets, analytics, and localization wiring in one module, with no automated tests and no CI. Version 10 is not a user-facing feature: it's the refactor that makes the codebase safe to keep extending, with the priorities set by a code review of the V9.5 branch (tests, real migrations, and CI mattering more at this point than another feature).
+
+### New Features (for contributors, not end users)
+- A real migration system: numbered `.sql` files in `migrations/`, tracked in a `schema_migrations` table, applied at most once per database
+- A pytest suite (55 tests) running against a real PostgreSQL database, covering auth, transactions, budgets, profile actions, and security (CSRF, lockout, cross-user access)
+- GitHub Actions CI: lint (`ruff`) and the full test suite against a Postgres service container, on every push and pull request
+
+### Backend Improvements
+- Split the monolithic `app.py` into Blueprints by feature area: `blueprints/auth.py`, `blueprints/profile.py`, `blueprints/dashboard.py`, `blueprints/transactions.py`, `blueprints/budgets.py`, with shared `constants.py` (categories) and `i18n.py` (the `t()` helper) modules
+- `app.py` is now a ~45-line application factory (`create_app()`) that wires config, CSRF, i18n, blueprints, and (at real startup, not in the factory) migrations together
+- Replaced the hand-rolled `initialize_database()`/`migrate_database()` functions with `db.py`'s `run_migrations()`, which applies any `migrations/*.sql` file not yet recorded in `schema_migrations` — each migration now runs exactly once per database instead of re-checking column types on every app startup
+- Fixed a real regression the refactor introduced and caught with a manual end-to-end pass, not just the test suite: `.env` values were silently not loading, because `db.py`'s module-level `DATABASE_URL` was evaluated (via the blueprint imports) before `app.py` ever called `load_dotenv()`. Fixed by having `db.py` load its own `.env` immediately before reading the variable it needs, instead of relying on import order elsewhere in the app
+- Removed the tracked `expenses.db`/`transactions.json` follow-through: they were already deleted in the previous patch, but `.gitignore` now also excludes `.pytest_cache/` and `.ruff_cache/`
+
+### What I Learned
+- Why "it works" and "it's tested" are different claims — the pytest suite caught nothing new in application logic (everything had already been manually verified), but running the *whole* suite against the *refactored* code is what caught the `.env` loading regression, which manual spot-checks of individual routes had missed
+- Why a real migration tracking table (`schema_migrations`) is simpler than the guard-and-recheck approach from the previous patch, not just "more proper" — once a migration is recorded as applied, it never needs to inspect `information_schema` again
+- How Python's module-level code executes exactly once, at first import, regardless of which import statement triggers it — and why that makes "where do I call `load_dotenv()`" an actual design decision, not a stylistic one
+- How Flask Blueprints namespace endpoints (`auth.login`, not `login`), and why every `url_for()` call in every template had to be updated in lockstep with the backend split
+- Why CI needs a real database service container, not a mock, for an app whose bugs (so far) have consistently been at the SQL/type boundary
+- That splitting a file is easy; splitting it *correctly* — deciding which module owns `get_budget_status()` when both the dashboard and the budgets page need it — is the actual design work
