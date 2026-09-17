@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Transactions{% endblock %}
+{% block title %}{{ t('transactions.title') }}{% endblock %}
 
 {% block content %}
-<p class="eyebrow">ACTIVITY</p>
-<h1>Transactions</h1>
+<p class="eyebrow">{{ t('transactions.eyebrow') }}</p>
+<h1>{{ t('transactions.title') }}</h1>
 <p class="page-subtitle">
-    Review, update, or remove your recorded transactions.
+    {{ t('transactions.subtitle') }}
 </p>
 
 <form method="GET" action="{{ url_for('transactions') }}" class="filter-form">
@@ -13,12 +13,12 @@
     <input
         type="text"
         name="search"
-        placeholder="Search source..."
+        placeholder="{{ t('transactions.search_placeholder') }}"
         value="{{ search }}"
     >
 
     <select name="category">
-        <option value="">All Categories</option>
+        <option value="">{{ t('transactions.all_categories') }}</option>
 
         {% for item in categories %}
             <option
@@ -31,21 +31,21 @@
     </select>
 
     <select name="type">
-        <option value="">All Types</option>
+        <option value="">{{ t('transactions.all_types') }}</option>
         <option value="income"
             {% if transaction_type == "income" %}selected{% endif %}>
-            Income
+            {{ t('transactions.income') }}
         </option>
         <option value="expense"
             {% if transaction_type == "expense" %}selected{% endif %}>
-            Expense
+            {{ t('transactions.expense') }}
         </option>
     </select>
 
-    <button type="submit">Apply Filters</button>
+    <button type="submit">{{ t('transactions.apply_filters') }}</button>
 
     <a href="{{ url_for('transactions') }}">
-        Clear
+        {{ t('transactions.clear') }}
     </a>
 
 </form>
@@ -55,13 +55,13 @@
     <table>
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Date</th>
-                <th>Source</th>
-                <th>Amount</th>
-                <th>Type</th>
-                <th>Category</th>
-                <th>Actions</th>
+                <th>{{ t('transactions.th_id') }}</th>
+                <th>{{ t('transactions.th_date') }}</th>
+                <th>{{ t('transactions.th_source') }}</th>
+                <th>{{ t('transactions.th_amount') }}</th>
+                <th>{{ t('transactions.th_type') }}</th>
+                <th>{{ t('transactions.th_category') }}</th>
+                <th>{{ t('transactions.th_actions') }}</th>
             </tr>
         </thead>
 
@@ -74,15 +74,15 @@
                     <td>{{ "%.2f"|format(transaction[3]) }}</td>
                     <td>
                         {% if transaction[4] == "income" %}
-                            <span class="type-badge income-badge">Income</span>
+                            <span class="type-badge income-badge">{{ t('transactions.income') }}</span>
                         {% else %}
-                            <span class="type-badge expense-badge">Expense</span>
+                            <span class="type-badge expense-badge">{{ t('transactions.expense') }}</span>
                         {% endif %}
                     </td>
                     <td>{{ transaction[5] }}</td>
                     <td>
                         <a href="{{ url_for('edit_transaction', transaction_id=transaction[0]) }}">
-                            Edit
+                            {{ t('transactions.edit') }}
                         </a>
 
                         <form
@@ -90,11 +90,12 @@
                             method="POST"
                             style="display:inline;"
                         >
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button
                                 type="submit"
-                                onclick="return confirm('Delete this transaction?');"
+                                onclick="return confirm('{{ t('transactions.delete_confirm') }}');"
                             >
-                                Delete
+                                {{ t('transactions.delete') }}
                             </button>
                         </form>
                     </td>
@@ -104,10 +105,10 @@
     </table>
 </div>
 {% else %}
-    <p>No transactions found.</p>
+    <p>{{ t('transactions.none_found') }}</p>
 {% endif %}
 
 <p>
-    <a href="{{ url_for('home') }}">Back to dashboard</a>
+    <a href="{{ url_for('home') }}">{{ t('transactions.back_to_dashboard') }}</a>
 </p>
 {% endblock %}
