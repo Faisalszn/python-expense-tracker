@@ -1,46 +1,36 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}{{ t('dashboard.title') }}{% endblock %}
 
 {% block content %}
-    <h1>Personal Finance Dashboard</h1>
+    <h1>{{ t('dashboard.title') }}</h1>
 
     <p class="dashboard-subtitle">
-        A clear view of your income, spending, and financial balance.
+        {{ t('dashboard.subtitle') }}
     </p>
-
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <ul>
-                {% for message in messages %}
-                    <li>{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
 
     <div class="summary-grid">
         <div class="summary-card">
-            <h2>Total Income</h2>
+            <h2>{{ t('dashboard.total_income') }}</h2>
             <p>{{ "%.2f"|format(total_income) }}</p>
         </div>
 
         <div class="summary-card">
-            <h2>Total Spending</h2>
+            <h2>{{ t('dashboard.total_spending') }}</h2>
             <p>{{ "%.2f"|format(total_spending) }}</p>
         </div>
 
         <div class="summary-card">
-            <h2>Balance</h2>
+            <h2>{{ t('dashboard.balance') }}</h2>
             <p>{{ "%.2f"|format(balance) }}</p>
         </div>
     </div>
 
     <section class="analytics-section">
         <div class="analytics-heading">
-            <p class="eyebrow">ANALYTICS</p>
-            <h2>Spending by Category</h2>
-            <p>See how your expenses are distributed across categories.</p>
+            <p class="eyebrow">{{ t('dashboard.analytics_eyebrow') }}</p>
+            <h2>{{ t('dashboard.spending_by_category') }}</h2>
+            <p>{{ t('dashboard.spending_by_category_desc') }}</p>
         </div>
 
         {% if spending_by_category %}
@@ -65,69 +55,37 @@
                 </div>
             </div>
         {% else %}
-            <p class="empty-state">No spending recorded yet.</p>
+            <p class="empty-state">{{ t('dashboard.no_spending') }}</p>
         {% endif %}
     </section>
 
     <section class="budget-section">
         <div class="analytics-heading">
-            <p class="eyebrow">THIS MONTH</p>
-            <h2>Budget Status</h2>
-            <p>Track your spending limits and see what's left to spend.</p>
+            <p class="eyebrow">{{ t('dashboard.budget_eyebrow') }}</p>
+            <h2>{{ t('dashboard.budget_status') }}</h2>
+            <p>{{ t('dashboard.budget_status_desc') }}</p>
         </div>
 
         {% if budget_status %}
             <div class="budget-list">
                 {% for budget in budget_status %}
-                    <div class="budget-card {% if budget.over_budget %}budget-over{% endif %}">
-                        <div class="budget-card-header">
-                            <span class="budget-category">{{ budget.category }}</span>
-                        </div>
-
-                        <div class="budget-progress-track">
-                            <div
-                                class="budget-progress-fill"
-                                style="width: {{ budget.display_percentage }}%;"
-                            ></div>
-                        </div>
-
-                        <div class="budget-figures">
-                            <span>
-                                {{ "%.2f"|format(budget.spent) }}
-                                <span class="riyal-icon">﷼</span> spent
-                            </span>
-
-                            <span>
-                                of {{ "%.2f"|format(budget.limit) }}
-                                <span class="riyal-icon">﷼</span>
-                            </span>
-                        </div>
-
-                        {% if budget.over_budget %}
-                            <p class="budget-warning">
-                                Over budget by {{ "%.2f"|format(budget.spent - budget.limit) }} ﷼
-                            </p>
-                        {% else %}
-                            <p class="budget-remaining">
-                                {{ "%.2f"|format(budget.remaining) }} ﷼ remaining this month
-                            </p>
-                        {% endif %}
-                    </div>
+                    {% include "_budget_card.html" %}
                 {% endfor %}
             </div>
         {% else %}
             <p class="empty-state">
-                No budgets set yet.
-                <a href="{{ url_for('budgets') }}">Set a budget</a> to start tracking spending limits.
+                {{ t('dashboard.no_budgets') }}
+                <a href="{{ url_for('budgets') }}">{{ t('dashboard.set_budget_link') }}</a>
+                {{ t('dashboard.set_budget_suffix') }}
             </p>
         {% endif %}
     </section>
 
     <section class="monthly-analytics">
         <div class="analytics-heading">
-            <p class="eyebrow">TREND</p>
-            <h2>Monthly Spending</h2>
-            <p>Track how your total expenses change over time.</p>
+            <p class="eyebrow">{{ t('dashboard.trend_eyebrow') }}</p>
+            <h2>{{ t('dashboard.monthly_spending') }}</h2>
+            <p>{{ t('dashboard.monthly_spending_desc') }}</p>
         </div>
 
         <div class="monthly-chart-card">

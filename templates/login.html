@@ -1,31 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}Log In{% endblock %}
+{% block title %}{{ t('login.title') }}{% endblock %}
 
 {% block content %}
 
 <div class="form-page">
 
     <div class="form-heading">
-        <p class="eyebrow">WELCOME BACK</p>
-        <h1>Log In</h1>
-        <p>Log in to view your transactions and budgets.</p>
+        <p class="eyebrow">{{ t('login.eyebrow') }}</p>
+        <h1>{{ t('login.title') }}</h1>
+        <p>{{ t('login.subtitle') }}</p>
     </div>
 
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <ul class="flash-message">
-                {% for message in messages %}
-                    <li>{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
-
     <form class="transaction-form" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group">
-            <label for="username">Username</label>
+            <label for="username">{{ t('login.username') }}</label>
             <input
                 id="username"
                 type="text"
@@ -36,7 +27,7 @@
         </div>
 
         <div class="form-group">
-            <label for="password">Password</label>
+            <label for="password">{{ t('login.password') }}</label>
             <input
                 id="password"
                 type="password"
@@ -47,11 +38,11 @@
 
         <div class="form-actions">
             <button class="form-submit" type="submit">
-                Log In
+                {{ t('login.submit') }}
             </button>
 
             <a class="form-cancel" href="{{ url_for('register') }}">
-                Create an account
+                {{ t('login.create_account_link') }}
             </a>
         </div>
 

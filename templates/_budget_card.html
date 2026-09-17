@@ -1,0 +1,50 @@
+{# Expects `budget` (dict from get_budget_status) and optional `show_remove`. #}
+<div class="budget-card {% if budget.over_budget %}budget-over{% endif %}">
+    <div class="budget-card-header">
+        <span class="budget-category">{{ budget.category }}</span>
+
+        {% if show_remove %}
+            <form
+                action="{{ url_for('delete_budget', category=budget.category) }}"
+                method="POST"
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button
+                    type="submit"
+                    onclick="return confirm('{{ t('budget.remove_confirm') }}');"
+                >
+                    {{ t('budget.remove') }}
+                </button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="budget-progress-track">
+        <div
+            class="budget-progress-fill"
+            style="width: {{ budget.display_percentage }}%;"
+        ></div>
+    </div>
+
+    <div class="budget-figures">
+        <span>
+            {{ "%.2f"|format(budget.spent) }}
+            <span class="riyal-icon">﷼</span> {{ t('budget.spent_suffix') }}
+        </span>
+
+        <span>
+            {{ t('budget.of') }} {{ "%.2f"|format(budget.limit) }}
+            <span class="riyal-icon">﷼</span>
+        </span>
+    </div>
+
+    {% if budget.over_budget %}
+        <p class="budget-warning">
+            {{ t('budget.over_by') }} {{ "%.2f"|format(budget.spent - budget.limit) }} ﷼
+        </p>
+    {% else %}
+        <p class="budget-remaining">
+            {{ "%.2f"|format(budget.remaining) }} ﷼ {{ t('budget.remaining_suffix') }}
+        </p>
+    {% endif %}
+</div>

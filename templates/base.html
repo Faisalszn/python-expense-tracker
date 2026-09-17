@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ lang }}" dir="{{ text_dir }}">
 <head>
     <title>{% block title %}Expense Tracker{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -9,41 +9,67 @@
         type="image/png"
         href="{{ url_for('static', filename='images/mizan-icon.png') }}"
     >
+
+    {% block head %}{% endblock %}
 </head>
 <body>
     <nav>
         <a class="nav-brand" href="{{ url_for('home') }}">
             <img
                 src="{{ url_for('static', filename='images/mizan-icon.png') }}"
-                alt="Mizan"
+                alt="{{ t('brand.name') }}"
             >
 
             <div class="nav-brand-text">
-                <span class="nav-brand-name">MIZAN</span>
-                <span class="nav-brand-subtitle">Personal Finance</span>
+                <span class="nav-brand-name">{{ t('brand.name') }}</span>
+                <span class="nav-brand-subtitle">{{ t('brand.subtitle') }}</span>
             </div>
         </a>
 
         <div class="nav-links">
             {% if session.get('user_id') %}
-                <a href="{{ url_for('home') }}">Dashboard</a>
-                <a href="{{ url_for('transactions') }}">Transactions</a>
-                <a href="{{ url_for('add_transaction') }}">Add Transaction</a>
-                <a href="{{ url_for('budgets') }}">Budgets</a>
+                <a href="{{ url_for('home') }}">{{ t('nav.dashboard') }}</a>
+                <a href="{{ url_for('transactions') }}">{{ t('nav.transactions') }}</a>
+                <a href="{{ url_for('add_transaction') }}">{{ t('nav.add_transaction') }}</a>
+                <a href="{{ url_for('budgets') }}">{{ t('nav.budgets') }}</a>
+                <a href="{{ url_for('profile') }}">{{ t('nav.profile') }}</a>
 
                 <span class="nav-user">{{ session.get('username') }}</span>
 
                 <form class="nav-logout" action="{{ url_for('logout') }}" method="POST">
-                    <button type="submit">Log Out</button>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit">{{ t('nav.logout') }}</button>
                 </form>
             {% else %}
-                <a href="{{ url_for('login') }}">Log In</a>
-                <a href="{{ url_for('register') }}">Create Account</a>
+                <a href="{{ url_for('login') }}">{{ t('nav.login') }}</a>
+                <a href="{{ url_for('register') }}">{{ t('nav.register') }}</a>
             {% endif %}
+
+            <div class="nav-lang-switch">
+                <form action="{{ url_for('set_language', lang='en') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="{{ 'nav-lang-active' if lang == 'en' }}">EN</button>
+                </form>
+
+                <form action="{{ url_for('set_language', lang='ar') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="{{ 'nav-lang-active' if lang == 'ar' }}">AR</button>
+                </form>
+            </div>
         </div>
     </nav>
 
     <main>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <ul class="flash-message">
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
         {% block content %}
         {% endblock %}
     </main>

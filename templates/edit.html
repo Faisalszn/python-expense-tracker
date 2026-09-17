@@ -1,42 +1,38 @@
 {% extends "base.html" %}
 
-{% block title %}Edit Transaction{% endblock %}
+{% block title %}{{ t('edit.title') }}{% endblock %}
+
+{% block head %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+{% endblock %}
 
 {% block content %}
 
 <div class="form-page">
 
     <div class="form-heading">
-        <p class="eyebrow">UPDATE ENTRY</p>
-        <h1>Edit Transaction</h1>
-        <p>Update the transaction details below.</p>
+        <p class="eyebrow">{{ t('edit.eyebrow') }}</p>
+        <h1>{{ t('edit.title') }}</h1>
+        <p>{{ t('edit.subtitle') }}</p>
     </div>
 
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <ul class="flash-message">
-                {% for message in messages %}
-                    <li>{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
-
     <form class="transaction-form" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group">
-            <label for="date">Date</label>
+            <label for="date">{{ t('form.date') }}</label>
             <input
                 id="date"
-                type="date"
                 name="date"
                 value="{{ transaction[1] }}"
+                placeholder="{{ t('form.date_placeholder') }}"
+                autocomplete="off"
                 required
             >
         </div>
 
         <div class="form-group">
-            <label for="source">Source</label>
+            <label for="source">{{ t('form.source') }}</label>
             <input
                 id="source"
                 type="text"
@@ -47,7 +43,7 @@
         </div>
 
         <div class="form-group">
-            <label for="amount">Amount</label>
+            <label for="amount">{{ t('form.amount') }}</label>
             <input
                 id="amount"
                 type="number"
@@ -59,22 +55,22 @@
         </div>
 
         <div class="form-group">
-            <label for="type">Type</label>
+            <label for="type">{{ t('form.type') }}</label>
             <select id="type" name="type" required>
                 <option value="income"
                     {% if transaction[4] == "income" %}selected{% endif %}>
-                    Income
+                    {{ t('transactions.income') }}
                 </option>
 
                 <option value="expense"
                     {% if transaction[4] == "expense" %}selected{% endif %}>
-                    Expense
+                    {{ t('transactions.expense') }}
                 </option>
             </select>
         </div>
 
         <div class="form-group">
-            <label for="category">Category</label>
+            <label for="category">{{ t('form.category') }}</label>
             <select id="category" name="category" required>
                 {% for category in categories %}
                     <option value="{{ category }}"
@@ -87,16 +83,21 @@
 
         <div class="form-actions">
             <button class="form-submit" type="submit">
-                Save Changes
+                {{ t('edit.submit') }}
             </button>
 
             <a class="form-cancel" href="{{ url_for('transactions') }}">
-                Cancel
+                {{ t('form.cancel') }}
             </a>
         </div>
 
     </form>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    flatpickr("#date", { dateFormat: "Y-m-d", allowInput: true });
+</script>
 
 {% endblock %}

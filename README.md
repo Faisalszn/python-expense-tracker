@@ -263,3 +263,43 @@ cp .env.example .env
 
 python app.py
 ```
+
+## Version 9.5 – Profile, Security Hardening, and Localization
+
+Version 9.5 rounded out the account system from V9 with a real profile page, several industry-standard security defenses, and English/Arabic localization, plus a themed date picker and stricter transaction validation.
+
+### New Features
+- A Profile page showing the username and "member since" date
+- Change password from the Profile page (requires the current password)
+- Delete account from the Profile page (requires a password confirmation; cascades to all of that user's transactions and budgets)
+- Account lockout after 5 failed login attempts, with a 15-minute cooldown
+- A language switcher (English / Arabic) in the navbar and on the Profile page, saved per-account and applied immediately, including a right-to-left layout for Arabic
+- A themed date picker (flatpickr) on Add/Edit Transaction that matches the site's color palette instead of the browser's native calendar
+- Confirmed empty/missing/whitespace-only dates are rejected server-side and never stored (this was already enforced by V9's validation — verified end-to-end rather than re-implemented)
+
+### Backend Improvements
+- Added CSRF protection (Flask-WTF) to every form in the app
+- Hardened session cookies: `HttpOnly`, `SameSite=Lax`, and `Secure` when `FLASK_ENV=production`
+- Debug mode is now controlled by a `FLASK_DEBUG` environment variable instead of being hardcoded
+- Added `language`, `created_at`, `failed_login_attempts`, and `locked_until` columns to `users` via an `ADD COLUMN IF NOT EXISTS` migration
+- Added a small `translations.py` module (English/Arabic string tables) and a `t()` Jinja helper injected via a Flask context processor, shared between templates and backend flash messages
+- Login now checks and updates the lockout state in the same request instead of only checking the password
+
+### Frontend Improvements
+- New Profile page with account info, a change-password form, a language selector, and a "danger zone" delete-account form
+- Extracted a shared `_budget_card.html` partial so the dashboard and Budgets page render identical budget cards from one template instead of two copies
+- Every page's static text and every flash/validation message now runs through the translation layer
+- `dir="rtl"` is applied automatically when Arabic is selected, with matching CSS overrides for layout, borders, and spacing
+- flatpickr is themed with the site's existing CSS custom properties (same brown/terracotta/sand palette) instead of introducing a new color scheme
+
+### What I chose not to build in this version
+Phone/SMS and email-based sign-in or password reset both need a paid third-party account (Twilio, SendGrid/SMTP) to actually deliver anything, and passkeys (WebAuthn) are a large, separable feature. All three were deferred rather than half-implemented — see "What I Learned" below for the reasoning.
+
+### What I Learned
+- Why CSRF protection matters for any form-based app, and how Flask-WTF wires a token into the session and validates it on every unsafe request
+- The difference between authentication (who you are) and account lockout (slowing down someone guessing who you are)
+- Why password confirmation is required before sensitive actions like changing a password or deleting an account, even though the user is already logged in
+- How to build a minimal i18n layer without a heavy framework: one lookup dictionary per language, one helper function, and a context processor
+- Why `dir="rtl"` alone isn't enough for a real right-to-left experience — spacing, borders, and flex/flow direction all need explicit overrides
+- That "looks stylable" and "is stylable" are different for native form controls — the native date picker can't be recolored, which is why a themed replacement (flatpickr) exists
+- That deferring a feature (phone/email/passkey login) is sometimes the more honest engineering choice than shipping a fake or broken version of it

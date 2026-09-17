@@ -1,6 +1,7 @@
 from functools import wraps
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
+from math import ceil
 import os
 
 from flask import (
@@ -11,15 +12,27 @@ from flask import (
     request,
     session,
 )
+from flask_wtf import CSRFProtect
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2 import errorcodes
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from translations import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, translate
+
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev")  # set SECRET_KEY in production
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    # Only require HTTPS-only cookies once the app is actually served over HTTPS.
+    SESSION_COOKIE_SECURE=os.environ.get("FLASK_ENV") == "production",
+)
+
+csrf = CSRFProtect(app)
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://localhost:5432/expense_tracker"
@@ -35,6 +48,9 @@ CATEGORIES = (
     "Salary",
     "Other",
 )
+
+LOGIN_ATTEMPT_LIMIT = 5
+LOGIN_LOCKOUT_MINUTES = 15
 
 @contextmanager
 def get_connection():
@@ -80,21 +96,56 @@ def initialize_database():
 
         connection.commit()
 
+def migrate_database():
+    with get_connection() as connection:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en'"
+        )
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at "
+            "TIMESTAMP NOT NULL DEFAULT now()"
+        )
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts "
+            "INTEGER NOT NULL DEFAULT 0"
+        )
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP"
+        )
+
+        connection.commit()
+
 initialize_database()
+migrate_database()
+
+def t(key, **kwargs):
+    """Translate `key` into the current session's language."""
+    return translate(key, session.get("language", DEFAULT_LANGUAGE), **kwargs)
+
+@app.context_processor
+def inject_i18n():
+    lang = session.get("language", DEFAULT_LANGUAGE)
+    return {
+        "t": t,
+        "lang": lang,
+        "text_dir": "rtl" if lang == "ar" else "ltr",
+    }
 
 def login_required(view):
     """Redirect anonymous visitors to the login page before running a view."""
     @wraps(view)
     def wrapped_view(*args, **kwargs):
         if "user_id" not in session:
-            flash("Please log in to continue")
+            flash(t("error.login_required"))
             return redirect("/login")
         return view(*args, **kwargs)
 
     return wrapped_view
 
 def validate_transaction_form(form):
-    """Validate submitted form data, returning (data, error) tuple."""
+    """Validate submitted form data, returning (data, error_key) tuple."""
     category = form.get("category", "").strip()
     date = form.get("date", "").strip()
     source = form.get("source", "").strip()
@@ -102,29 +153,29 @@ def validate_transaction_form(form):
     transaction_type = form.get("type", "").strip().lower()
 
     if category not in CATEGORIES:
-        return None, "Invalid category"
+        return None, "error.invalid_category"
 
     if not date:
-        return None, "Date is required"
+        return None, "error.date_required"
     try:
         datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
-        return None, "Invalid date format"
+        return None, "error.invalid_date_format"
 
     if not source:
-        return None, "Source is required"
+        return None, "error.source_required"
     if source.isdigit():
-        return None, "Source cannot be only numbers"
+        return None, "error.source_numeric"
 
     try:
         amount = float(amount_input)
     except ValueError:
-        return None, "Amount must be a number"
+        return None, "error.amount_not_number"
     if amount <= 0:
-        return None, "Amount must be greater than 0"
+        return None, "error.amount_not_positive"
 
     if transaction_type not in ("income", "expense"):
-        return None, "Invalid transaction type"
+        return None, "error.invalid_transaction_type"
 
     return {
         "date": date,
@@ -135,11 +186,11 @@ def validate_transaction_form(form):
     }, None
 
 def validate_credentials(username, password):
-    """Validate a username/password pair, returning an error message or None."""
+    """Validate a username/password pair, returning an error key or None."""
     if not username:
-        return "Username is required"
+        return "error.username_required"
     if len(password) < 8:
-        return "Password must be at least 8 characters"
+        return "error.password_too_short"
     return None
 
 
@@ -152,10 +203,10 @@ def register():
 
         error = validate_credentials(username, password)
         if not error and password != confirm_password:
-            error = "Passwords do not match"
+            error = "error.passwords_mismatch"
 
         if error:
-            flash(error)
+            flash(t(error))
             return render_template("register.html"), 400
 
         # pbkdf2 avoids relying on hashlib.scrypt, which isn't available on
@@ -168,22 +219,22 @@ def register():
                 cursor = connection.cursor()
                 cursor.execute(
                     """
-                    INSERT INTO users (username, password_hash)
-                    VALUES (%s, %s)
+                    INSERT INTO users (username, password_hash, language)
+                    VALUES (%s, %s, %s)
                     RETURNING id
                     """,
-                    (username, password_hash)
+                    (username, password_hash, session.get("language", DEFAULT_LANGUAGE))
                 )
                 user_id = cursor.fetchone()[0]
                 connection.commit()
         except psycopg2.IntegrityError as e:
             if e.pgcode == errorcodes.UNIQUE_VIOLATION:
-                flash("Username is already taken")
+                flash(t("error.username_taken"))
             else:
-                flash(f"Database error: {e}")
+                flash(t("error.database", error=e))
             return render_template("register.html"), 400
         except psycopg2.Error as e:
-            flash(f"Database error: {e}")
+            flash(t("error.database", error=e))
             return render_template("register.html"), 500
 
         session["user_id"] = user_id
@@ -193,31 +244,85 @@ def register():
     return render_template("register.html")
 
 
+def get_user_by_username(username):
+    """Return (id, password_hash, language, failed_login_attempts, locked_until)."""
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                SELECT id, password_hash, language, failed_login_attempts, locked_until
+                FROM users
+                WHERE username = %s
+                """,
+                (username,)
+            )
+            return cursor.fetchone()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return None
+
+
+def record_failed_login(user_id, failed_attempts):
+    """Increment the failed-attempt counter, locking the account past the limit."""
+    new_attempts = failed_attempts + 1
+    locked_until = None
+    if new_attempts >= LOGIN_ATTEMPT_LIMIT:
+        locked_until = datetime.now() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+        new_attempts = 0
+
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE users SET failed_login_attempts = %s, locked_until = %s WHERE id = %s",
+                (new_attempts, locked_until, user_id)
+            )
+            connection.commit()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+
+
+def record_successful_login(user_id):
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = %s",
+                (user_id,)
+            )
+            connection.commit()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
 
-        try:
-            with get_connection() as connection:
-                cursor = connection.cursor()
-                cursor.execute(
-                    "SELECT id, password_hash FROM users WHERE username = %s",
-                    (username,)
-                )
-                user = cursor.fetchone()
-        except psycopg2.Error as e:
-            flash(f"Database error: {e}")
-            return render_template("login.html"), 500
+        user = get_user_by_username(username)
 
-        if user is None or not check_password_hash(user[1], password):
-            flash("Invalid username or password")
-            return render_template("login.html"), 400
+        if user is not None:
+            user_id, password_hash, language, failed_attempts, locked_until = user
 
-        session["user_id"] = user[0]
-        session["username"] = username
-        return redirect("/")
+            if locked_until is not None and locked_until > datetime.now():
+                minutes_left = ceil((locked_until - datetime.now()).total_seconds() / 60)
+                flash(t("error.account_locked", minutes=minutes_left))
+                return render_template("login.html"), 429
+
+            if check_password_hash(password_hash, password):
+                record_successful_login(user_id)
+                session["user_id"] = user_id
+                session["username"] = username
+                session["language"] = language or DEFAULT_LANGUAGE
+                return redirect("/")
+
+            record_failed_login(user_id, failed_attempts)
+
+        flash(t("error.invalid_login"))
+        return render_template("login.html"), 400
 
     return render_template("login.html")
 
@@ -225,6 +330,137 @@ def login():
 @app.route("/logout", methods=["POST"])
 def logout():
     session.clear()
+    return redirect("/login")
+
+
+@app.route("/language/<lang>", methods=["POST"])
+def set_language(lang):
+    if lang not in SUPPORTED_LANGUAGES:
+        lang = DEFAULT_LANGUAGE
+
+    session["language"] = lang
+
+    if "user_id" in session:
+        try:
+            with get_connection() as connection:
+                cursor = connection.cursor()
+                cursor.execute(
+                    "UPDATE users SET language = %s WHERE id = %s",
+                    (lang, session["user_id"])
+                )
+                connection.commit()
+        except psycopg2.Error as e:
+            flash(t("error.database", error=e))
+
+    return redirect(request.referrer or "/")
+
+
+@app.route("/profile")
+@login_required
+def profile():
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT username, created_at, language FROM users WHERE id = %s",
+                (session["user_id"],)
+            )
+            user = cursor.fetchone()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        user = None
+
+    return render_template(
+        "profile.html",
+        username=user[0] if user else session.get("username"),
+        member_since=user[1] if user else None,
+        languages=SUPPORTED_LANGUAGES
+    )
+
+
+@app.route("/profile/password", methods=["POST"])
+@login_required
+def change_password():
+    current_password = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    confirm_new_password = request.form.get("confirm_new_password", "")
+
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT password_hash FROM users WHERE id = %s",
+                (session["user_id"],)
+            )
+            row = cursor.fetchone()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return redirect("/profile")
+
+    if row is None or not check_password_hash(row[0], current_password):
+        flash(t("error.current_password_incorrect"))
+        return redirect("/profile")
+
+    error = validate_credentials(session.get("username", ""), new_password)
+    if not error and new_password != confirm_new_password:
+        error = "error.passwords_mismatch"
+    if not error and check_password_hash(row[0], new_password):
+        error = "error.new_password_same"
+
+    if error:
+        flash(t(error))
+        return redirect("/profile")
+
+    new_password_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
+
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE users SET password_hash = %s WHERE id = %s",
+                (new_password_hash, session["user_id"])
+            )
+            connection.commit()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return redirect("/profile")
+
+    flash(t("success.password_changed"))
+    return redirect("/profile")
+
+
+@app.route("/profile/delete", methods=["POST"])
+@login_required
+def delete_account():
+    password = request.form.get("password", "")
+
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT password_hash FROM users WHERE id = %s",
+                (session["user_id"],)
+            )
+            row = cursor.fetchone()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return redirect("/profile")
+
+    if row is None or not check_password_hash(row[0], password):
+        flash(t("error.delete_password_incorrect"))
+        return redirect("/profile")
+
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute("DELETE FROM users WHERE id = %s", (session["user_id"],))
+            connection.commit()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return redirect("/profile")
+
+    session.clear()
+    flash(t("success.account_deleted"))
     return redirect("/login")
 
 
@@ -292,7 +528,7 @@ def get_summary(user_id):
             )
             total_spending = cursor.fetchone()[0] or 0
     except psycopg2.Error as e:
-        flash(f"Database error: {e}")
+        flash(t("error.database", error=e))
         total_income = total_spending = 0
 
     return total_income, total_spending, total_income - total_spending
@@ -327,7 +563,7 @@ def get_transactions(user_id, search="", category="", transaction_type=""):
             cursor.execute(query, params)
             return cursor.fetchall()
     except psycopg2.Error as e:
-        flash(f"Database error: {e}")
+        flash(t("error.database", error=e))
         return []
 
 
@@ -343,7 +579,7 @@ def get_transaction_by_id(transaction_id, user_id):
             )
             return cursor.fetchone()
     except psycopg2.Error as e:
-        flash(f"Database error: {e}")
+        flash(t("error.database", error=e))
         return None
 
 
@@ -357,7 +593,7 @@ def edit_transaction(transaction_id):
     if request.method == "POST":
         data, error = validate_transaction_form(request.form)
         if error:
-            flash(error)
+            flash(t(error))
             return render_template(
                 "edit.html",
                 transaction=transaction,
@@ -378,7 +614,7 @@ def edit_transaction(transaction_id):
                 )
                 connection.commit()
         except psycopg2.Error as e:
-            flash(f"Database error: {e}")
+            flash(t("error.database", error=e))
             return render_template(
                 "edit.html",
                 transaction=transaction,
@@ -396,7 +632,7 @@ def add_transaction():
     if request.method == "POST":
         data, error = validate_transaction_form(request.form)
         if error:
-            flash(error)
+            flash(t(error))
             return render_template("add.html", categories=CATEGORIES), 400
 
         try:
@@ -412,7 +648,7 @@ def add_transaction():
                 )
                 connection.commit()
         except psycopg2.Error as e:
-            flash(f"Database error: {e}")
+            flash(t("error.database", error=e))
             return render_template("add.html", categories=CATEGORIES), 500
 
         return redirect("/")
@@ -432,7 +668,7 @@ def delete_transaction(transaction_id):
             )
             connection.commit()
     except psycopg2.Error as e:
-        flash(f"Database error: {e}")
+        flash(t("error.database", error=e))
 
     return redirect("/transactions")
 
@@ -445,17 +681,17 @@ def budgets():
         limit_input = request.form.get("monthly_limit", "").strip()
 
         if category not in CATEGORIES:
-            flash("Invalid category")
+            flash(t("error.invalid_category"))
             return redirect("/budgets")
 
         try:
             monthly_limit = float(limit_input)
         except ValueError:
-            flash("Monthly limit must be a number")
+            flash(t("error.monthly_limit_not_number"))
             return redirect("/budgets")
 
         if monthly_limit <= 0:
-            flash("Monthly limit must be greater than 0")
+            flash(t("error.monthly_limit_not_positive"))
             return redirect("/budgets")
 
         try:
@@ -472,7 +708,7 @@ def budgets():
                 )
                 connection.commit()
         except psycopg2.Error as e:
-            flash(f"Database error: {e}")
+            flash(t("error.database", error=e))
 
         return redirect("/budgets")
 
@@ -495,7 +731,7 @@ def delete_budget(category):
             )
             connection.commit()
     except psycopg2.Error as e:
-        flash(f"Database error: {e}")
+        flash(t("error.database", error=e))
 
     return redirect("/budgets")
 
@@ -518,7 +754,7 @@ def get_spending_by_category(user_id):
 
             return cursor.fetchall()
     except psycopg2.Error as e:
-        flash(f"Database error: {e}")
+        flash(t("error.database", error=e))
         return []
 
 
@@ -540,7 +776,7 @@ def get_monthly_spending(user_id):
 
             return cursor.fetchall()
     except psycopg2.Error as e:
-        flash(f"Database error: {e}")
+        flash(t("error.database", error=e))
         return []
 
 
@@ -576,7 +812,7 @@ def get_budget_status(user_id):
             )
             spending_by_category = dict(cursor.fetchall())
     except psycopg2.Error as e:
-        flash(f"Database error: {e}")
+        flash(t("error.database", error=e))
         return []
 
     status = []
@@ -598,4 +834,4 @@ def get_budget_status(user_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.environ.get("FLASK_DEBUG", "1") == "1")
