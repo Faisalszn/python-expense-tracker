@@ -1,0 +1,65 @@
+{% macro logo() -%}
+    <a class="nav-brand" href="{{ url_for('dashboard.home') }}">
+        <img src="{{ url_for('static', filename='images/mizan-logo-horizontal.png') }}"
+             width="156"
+             height="52"
+             alt="{{ t("brand.name") }} — {{ t("brand.subtitle") }}">
+    </a>
+{%- endmacro %}
+{% macro links() -%}
+    {% for endpoint, key in [('dashboard.home','dashboard'),('transactions.index','transactions'),('transactions.add','add_transaction'),('budgets.index','budgets'),('profile.profile','profile')] %}
+        <a href="{{ url_for(endpoint) }}"
+           {% if request.endpoint == endpoint or (endpoint == 'transactions.index' and request.endpoint == 'transactions.edit') %}aria-current="page"{% endif %}>{{ t('nav.' ~ key) }}</a>
+    {% endfor %}
+{%- endmacro %}
+{% macro languages() -%}
+    <div class="language-switch"
+         role="group"
+         aria-label="{{ t('profile.language_heading') }}">
+        {% for code, label in [('en','English'),('ar','العربية')] %}
+            <form action="{{ url_for('profile.set_language', lang=code) }}"
+                  method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit"
+                        class="{{ 'btn-primary' if lang == code else 'btn-secondary' }}"
+                        lang="{{ code }}"
+                        aria-pressed="{{ 'true' if lang == code else 'false' }}">{{ label }}</button>
+            </form>
+        {% endfor %}
+    </div>
+{%- endmacro %}
+{% macro logout() -%}
+    <form class="nav-logout"
+          action="{{ url_for('auth.logout') }}"
+          method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn-secondary" type="submit">{{ t("nav.logout") }}</button>
+    </form>
+{%- endmacro %}
+{% macro empty(title, description, label='', href='', heading='h3') -%}
+    <div class="empty-state">
+        <span class="empty-cue" aria-hidden="true">＋</span>
+        {% if heading == 'h2' %}
+            <h2>{{ title }}</h2>
+        {% else %}
+            <h3>{{ title }}</h3>
+        {% endif %}
+        <p>{{ description }}</p>
+        {% if label %}<a class="btn-primary" href="{{ href }}">{{ label }}</a>{% endif %}
+    </div>
+{%- endmacro %}
+{% macro transaction_actions(transaction) -%}
+    <div class="transaction-actions">
+        <a class="btn-secondary"
+           href="{{ url_for('transactions.edit', transaction_id=transaction[0]) }}">{{ t("transactions.edit") }}<span class="sr-only">: {{ transaction[2] }}</span></a>
+        <form action="{{ url_for('transactions.delete', transaction_id=transaction[0]) }}"
+              method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn-danger"
+                    type="submit"
+                    onclick="return confirm('{{ t("transactions.delete_confirm") }}');">
+                {{ t("transactions.delete") }}<span class="sr-only">: {{ transaction[2] }}</span>
+            </button>
+        </form>
+    </div>
+{%- endmacro %}

@@ -1,111 +1,103 @@
 {% extends "base.html" %}
-
-{% block title %}{{ t('dashboard.title') }}{% endblock %}
-
+{% from '_ui.html' import empty with context %}
+{% block title %}{{ t("dashboard.title") }}{% endblock %}
 {% block content %}
-    <h1>{{ t('dashboard.title') }}</h1>
-
-    <p class="dashboard-subtitle">
-        {{ t('dashboard.subtitle') }}
-    </p>
-
+    <header class="page-heading">
+        <div>
+            <h1>{{ t("nav.dashboard") }}</h1>
+            <p>{{ t("ui.dashboard_subtitle") }}</p>
+        </div>
+        <a class="btn-primary" href="{{ url_for('transactions.add') }}">{{ t("nav.add_transaction") }}</a>
+    </header>
     <div class="summary-grid">
-        <div class="summary-card">
-            <h2>{{ t('dashboard.total_income') }}</h2>
-            <p>{{ "%.2f"|format(total_income) }}</p>
-        </div>
-
-        <div class="summary-card">
-            <h2>{{ t('dashboard.total_spending') }}</h2>
-            <p>{{ "%.2f"|format(total_spending) }}</p>
-        </div>
-
-        <div class="summary-card">
-            <h2>{{ t('dashboard.balance') }}</h2>
-            <p>{{ "%.2f"|format(balance) }}</p>
-        </div>
+        {% for label, value, kind in [('dashboard.total_income', total_income, 'income'), ('dashboard.total_spending',total_spending,'spending'), ('dashboard.balance',balance,'balance')] %}
+            <section class="summary-card {{ kind }}">
+                <h2>{{ t(label) }}</h2>
+                <p>
+                    <bdi>{{ "%.2f"|format(value) }}</bdi> <span class="currency">{{ t("ui.currency") }}</span>
+                </p>
+            </section>
+        {% endfor %}
     </div>
-
-    <section class="analytics-section">
-        <div class="analytics-heading">
-            <p class="eyebrow">{{ t('dashboard.analytics_eyebrow') }}</p>
-            <h2>{{ t('dashboard.spending_by_category') }}</h2>
-            <p>{{ t('dashboard.spending_by_category_desc') }}</p>
-        </div>
-
-        {% if spending_by_category %}
-            <div class="spending-section">
-                <div class="chart-card">
-                    <canvas id="spendingChart"></canvas>
-                </div>
-
-                <div class="category-panel">
-                    <div class="category-list">
-                        {% for category, total in spending_by_category %}
-                            <div class="category-row">
-                                <span class="category-name">{{ t('category.' ~ category) }}</span>
-
-                                <span class="category-total">
-                                    {{ "%.2f"|format(total) }}
-                                    <span class="riyal-icon">﷼</span>
-                                </span>
+    <div class="analytics-grid">
+        <section class="panel analytics-section">
+            <h2>{{ t("dashboard.spending_by_category") }}</h2>
+            <p class="section-description">{{ t("ui.all_spending") }}</p>
+            {% if spending_by_category %}
+                <div class="category-list">
+                    {% set largest = category_totals|max %}
+                    {% for category, total in spending_by_category %}
+                        <div class="category-row">
+                            <div class="category-label">
+                                <strong>{{ t('category.' ~ category) }}</strong><span><bdi>{{ "%.2f"|format(total) }}</bdi> {{ t("ui.currency") }}</span>
                             </div>
-                        {% endfor %}
-                    </div>
+                            <div class="category-track" aria-hidden="true">
+                                <span style="width: {{ (total|float / largest * 100) if largest else 0 }}%"></span>
+                            </div>
+                        </div>
+                    {% endfor %}
                 </div>
+            {% else %}
+                {{ empty(t('ui.no_spending') ,t('ui.spending_help'),t('nav.add_transaction'),url_for('transactions.add')) }}
+            {% endif %}
+        </section>
+        <section class="panel budget-section">
+            <h2>{{ t("dashboard.budget_status") }}</h2>
+            <p class="section-description">{{ t("dashboard.budget_eyebrow") }}</p>
+            {% if budget_status %}
+                <div class="budget-list">
+                    {% for budget in budget_status %}
+                        {% include '_budget_card.html' %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                {{ empty(t('dashboard.no_budgets') ,t('ui.budgets_help'),t('budgets.set_a_budget'),url_for('budgets.index')) }}
+            {% endif %}
+        </section>
+    </div>
+    <section class="panel monthly-analytics">
+        <h2>{{ t("dashboard.monthly_spending") }}</h2>
+        <p class="section-description">{{ t("dashboard.monthly_spending_desc") }}</p>
+        {% if monthly_labels %}
+            <div class="monthly-chart-card">
+                <canvas id="monthlySpendingChart"
+                        role="img"
+                        aria-label="{{ t('dashboard.monthly_spending') }}"
+                        aria-describedby="monthly-data-toggle"></canvas>
             </div>
+            <details id="monthly-data" class="chart-data">
+                <summary id="monthly-data-toggle">{{ t("ui.view_data") }}</summary>
+                <table>
+                    <caption>{{ t('dashboard.monthly_spending') }} — {{ t("ui.currency") }}</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">{{ t("ui.month") }}</th>
+                            <th scope="col">{{ t("form.amount") }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for label in monthly_labels %}
+                            <tr>
+                                <th scope="row">
+                                    <bdi>{{ label }}</bdi>
+                                </th>
+                                <td>
+                                    <bdi>{{ '%.2f'|format(monthly_totals[loop.index0]) }}</bdi>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </details>
         {% else %}
-            <p class="empty-state">{{ t('dashboard.no_spending') }}</p>
+            {{ empty(t('ui.no_monthly') ,t('ui.monthly_help'),t('nav.add_transaction'),url_for('transactions.add')) }}
         {% endif %}
     </section>
-
-    <section class="budget-section">
-        <div class="analytics-heading">
-            <p class="eyebrow">{{ t('dashboard.budget_eyebrow') }}</p>
-            <h2>{{ t('dashboard.budget_status') }}</h2>
-            <p>{{ t('dashboard.budget_status_desc') }}</p>
-        </div>
-
-        {% if budget_status %}
-            <div class="budget-list">
-                {% for budget in budget_status %}
-                    {% include "_budget_card.html" %}
-                {% endfor %}
-            </div>
-        {% else %}
-            <p class="empty-state">
-                {{ t('dashboard.no_budgets') }}
-                <a href="{{ url_for('budgets.index') }}">{{ t('dashboard.set_budget_link') }}</a>
-                {{ t('dashboard.set_budget_suffix') }}
-            </p>
-        {% endif %}
-    </section>
-
-    <section class="monthly-analytics">
-        <div class="analytics-heading">
-            <p class="eyebrow">{{ t('dashboard.trend_eyebrow') }}</p>
-            <h2>{{ t('dashboard.monthly_spending') }}</h2>
-            <p>{{ t('dashboard.monthly_spending_desc') }}</p>
-        </div>
-
-        <div class="monthly-chart-card">
-            <canvas id="monthlySpendingChart"></canvas>
-        </div>
-    </section>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <script>
-        window.spendingData = {
-            labels: {{ category_labels | tojson }},
-            totals: {{ category_totals | tojson }}
-        };
-
-        window.monthlySpendingData = {
-            labels: {{ monthly_labels | tojson }},
-            totals: {{ monthly_totals | tojson }}
-        };
-    </script>
-
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    {% if monthly_labels %}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+window.monthlySpendingData = {labels: {{ monthly_labels|tojson }}, totals: {{ monthly_totals|tojson }}};
+        </script>
+        <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    {% endif %}
 {% endblock %}

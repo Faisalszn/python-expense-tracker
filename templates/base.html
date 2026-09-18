@@ -1,77 +1,72 @@
+{% from '_ui.html' import logo, links, languages, logout with context %}
 <!DOCTYPE html>
 <html lang="{{ lang }}" dir="{{ text_dir }}">
-<head>
-    <title>{% block title %}Expense Tracker{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
-    <link
-        rel="icon"
-        type="image/png"
-        href="{{ url_for('static', filename='images/mizan-icon.png') }}"
-    >
-
-    {% block head %}{% endblock %}
-</head>
-<body>
-    <nav>
-        <a class="nav-brand" href="{{ url_for('dashboard.home') }}">
-            <img
-                src="{{ url_for('static', filename='images/mizan-icon.png') }}"
-                alt="{{ t('brand.name') }}"
-            >
-
-            <div class="nav-brand-text">
-                <span class="nav-brand-name">{{ t('brand.name') }}</span>
-                <span class="nav-brand-subtitle">{{ t('brand.subtitle') }}</span>
-            </div>
-        </a>
-
-        <div class="nav-links">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>
+            {% block title %}Expense Tracker{% endblock %}
+        </title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+        <link rel="icon"
+              type="image/png"
+              href="{{ url_for('static', filename='images/mizan-icon.png') }}">
+        {% if session.get('user_id') %}
+            <script src="{{ url_for('static', filename='js/navigation.js') }}" defer></script>
+        {% endif %}
+        {% block head %}{% endblock %}
+    </head>
+    <body>
+        <a class="skip-link" href="#main-content">{{ t("ui.skip") }}</a>
+        <header class="site-header {{ 'auth-header' if not session.get("user_id") }}">
+            {{ logo() }}
             {% if session.get('user_id') %}
-                <a href="{{ url_for('dashboard.home') }}">{{ t('nav.dashboard') }}</a>
-                <a href="{{ url_for('transactions.index') }}">{{ t('nav.transactions') }}</a>
-                <a href="{{ url_for('transactions.add') }}">{{ t('nav.add_transaction') }}</a>
-                <a href="{{ url_for('budgets.index') }}">{{ t('nav.budgets') }}</a>
-                <a href="{{ url_for('profile.profile') }}">{{ t('nav.profile') }}</a>
-
-                <span class="nav-user">{{ session.get('username') }}</span>
-
-                <form class="nav-logout" action="{{ url_for('auth.logout') }}" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit">{{ t('nav.logout') }}</button>
-                </form>
+                <nav class="desktop-nav" aria-label="{{ t('ui.navigation') }}">
+                    {{ links() }}
+                </nav>
+                <div class="desktop-account">
+                    <bdi class="nav-user">{{ session.get("username") }}</bdi>{{ languages() }}{{ logout() }}
+                </div>
+                <button id="menu-toggle"
+                        class="btn-secondary menu-toggle"
+                        type="button"
+                        aria-expanded="false"
+                        aria-controls="navigation-drawer"
+                        hidden>{{ t("ui.menu") }}</button>
             {% else %}
-                <a href="{{ url_for('auth.login') }}">{{ t('nav.login') }}</a>
-                <a href="{{ url_for('auth.register') }}">{{ t('nav.register') }}</a>
+                {{ languages() }}
             {% endif %}
-
-            <div class="nav-lang-switch">
-                <form action="{{ url_for('profile.set_language', lang='en') }}" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="{{ 'nav-lang-active' if lang == 'en' }}">EN</button>
-                </form>
-
-                <form action="{{ url_for('profile.set_language', lang='ar') }}" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="{{ 'nav-lang-active' if lang == 'ar' }}">AR</button>
-                </form>
-            </div>
-        </div>
-    </nav>
-
-    <main>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <ul class="flash-message">
-                    {% for message in messages %}
-                        <li>{{ message }}</li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        {% endwith %}
-
-        {% block content %}
-        {% endblock %}
-    </main>
-</body>
+        </header>
+        {% if session.get('user_id') %}
+            <dialog id="navigation-drawer"
+                    class="navigation-drawer"
+                    aria-labelledby="drawer-title">
+                <div class="drawer-header">
+                    {{ logo() }}
+                    <button class="btn-secondary" type="button" data-close-drawer>{{ t("ui.close") }}</button>
+                </div>
+                <h2 id="drawer-title">
+                    <bdi>{{ session.get("username") }}</bdi>
+                </h2>
+                <p>{{ t("ui.account") }}</p>
+                <nav class="drawer-links" aria-label="{{ t('ui.navigation') }}">
+                    {{ links() }}
+                </nav>
+                <p class="form-label">{{ t("profile.language_heading") }}</p>
+                {{ languages() }}{{ logout() }}
+            </dialog>
+        {% endif %}
+        <main id="main-content"
+              tabindex="-1"
+              class="{{ 'auth-main' if request.endpoint in ['auth.login', 'auth.register'] }}">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <ul class="flash-message" role="alert" tabindex="-1">
+                        {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </main>
+    </body>
 </html>
