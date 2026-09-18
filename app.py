@@ -6,6 +6,7 @@ from flask_wtf import CSRFProtect
 from blueprints.auth import auth_bp
 from blueprints.budgets import budgets_bp
 from blueprints.dashboard import dashboard_bp
+from blueprints.health import health_bp
 from blueprints.profile import profile_bp
 from blueprints.transactions import transactions_bp
 from i18n import register_i18n
@@ -35,6 +36,7 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(transactions_bp)
     app.register_blueprint(budgets_bp)
+    app.register_blueprint(health_bp)
 
     return app
 
