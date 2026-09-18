@@ -8,7 +8,6 @@ from blueprints.budgets import budgets_bp
 from blueprints.dashboard import dashboard_bp
 from blueprints.profile import profile_bp
 from blueprints.transactions import transactions_bp
-from db import run_migrations  # also loads .env, before any other module reads it
 from i18n import register_i18n
 
 
@@ -41,7 +40,6 @@ def create_app():
 
 
 app = create_app()
-run_migrations()
 
 if __name__ == "__main__":
     app.run(debug=os.environ.get("FLASK_DEBUG", "1") == "1")
