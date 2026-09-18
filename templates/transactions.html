@@ -1,114 +1,100 @@
 {% extends "base.html" %}
-{% block title %}{{ t('transactions.title') }}{% endblock %}
-
+{% from '_ui.html' import empty, transaction_actions with context %}
+{% block title %}{{ t("transactions.title") }}{% endblock %}
 {% block content %}
-<p class="eyebrow">{{ t('transactions.eyebrow') }}</p>
-<h1>{{ t('transactions.title') }}</h1>
-<p class="page-subtitle">
-    {{ t('transactions.subtitle') }}
-</p>
-
-<form method="GET" action="{{ url_for('transactions.index') }}" class="filter-form">
-
-    <input
-        type="text"
-        name="search"
-        placeholder="{{ t('transactions.search_placeholder') }}"
-        value="{{ search }}"
-    >
-
-    <select name="category">
-        <option value="">{{ t('transactions.all_categories') }}</option>
-
-        {% for item in categories %}
-            <option
-                value="{{ item }}"
-                {% if category == item %}selected{% endif %}
-            >
-                {{ t('category.' ~ item) }}
-            </option>
-        {% endfor %}
-    </select>
-
-    <select name="type">
-        <option value="">{{ t('transactions.all_types') }}</option>
-        <option value="income"
-            {% if transaction_type == "income" %}selected{% endif %}>
-            {{ t('transactions.income') }}
-        </option>
-        <option value="expense"
-            {% if transaction_type == "expense" %}selected{% endif %}>
-            {{ t('transactions.expense') }}
-        </option>
-    </select>
-
-    <button type="submit">{{ t('transactions.apply_filters') }}</button>
-
-    <a href="{{ url_for('transactions.index') }}">
-        {{ t('transactions.clear') }}
-    </a>
-
-</form>
-
-{% if transactions %}
-<div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>{{ t('transactions.th_id') }}</th>
-                <th>{{ t('transactions.th_date') }}</th>
-                <th>{{ t('transactions.th_source') }}</th>
-                <th>{{ t('transactions.th_amount') }}</th>
-                <th>{{ t('transactions.th_type') }}</th>
-                <th>{{ t('transactions.th_category') }}</th>
-                <th>{{ t('transactions.th_actions') }}</th>
-            </tr>
-        </thead>
-
-        <tbody>
+    <header class="page-heading">
+        <div>
+            <h1>{{ t("transactions.title") }}</h1>
+            <p>{{ t("transactions.subtitle") }}</p>
+        </div>
+        <a class="btn-primary" href="{{ url_for('transactions.add') }}">{{ t("nav.add_transaction") }}</a>
+    </header>
+    <form method="GET"
+          action="{{ url_for('transactions.index') }}"
+          class="filter-form panel">
+        <div class="form-group">
+            <label for="search">{{ t("ui.search_source") }}</label>
+            <input id="search"
+                   type="search"
+                   name="search"
+                   placeholder="{{ t('transactions.search_placeholder') }}"
+                   value="{{ search }}">
+        </div>
+        <div class="form-group">
+            <label for="filter-category">{{ t("form.category") }}</label>
+            <select id="filter-category" name="category">
+                <option value="">{{ t("transactions.all_categories") }}</option>
+                {% for item in categories %}
+                    <option value="{{ item }}" {% if category == item %}selected{% endif %}>{{ t('category.' ~ item) }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="filter-type">{{ t("form.type") }}</label>
+            <select id="filter-type" name="type">
+                <option value="">{{ t("transactions.all_types") }}</option>
+                {% for kind in ['income','expense'] %}
+                    <option value="{{ kind }}"
+                            {% if transaction_type == kind %}selected{% endif %}>
+                        {{ t('transactions.' ~ kind) }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-actions">
+            <button type="submit">{{ t("transactions.apply_filters") }}</button>
+            <a class="btn-secondary" href="{{ url_for('transactions.index') }}">{{ t("transactions.clear") }}</a>
+        </div>
+    </form>
+    {% if transactions %}
+        <div class="table-container">
+            <table>
+                <caption class="sr-only">{{ t("transactions.title") }}</caption>
+                <thead>
+                    <tr>
+                        {% for key in ['id','date','source','amount','type','category','actions'] %}
+                            <th scope="col" class="{{ 'amount' if key == 'amount' }}">{{ t('transactions.th_' ~ key) }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                        <tr>
+                            <td>{{ transaction[0] }}</td>
+                            <td>
+                                <bdi>{{ transaction[1] }}</bdi>
+                            </td>
+                            <td class="source-cell">{{ transaction[2] }}</td>
+                            <td class="amount {{ transaction[4] }}-text">
+                                <bdi>{{ '＋' if transaction[4] == 'income' else '−' }}{{ '%.2f'|format(transaction[3]) }}</bdi> {{ t("ui.currency") }}
+                            </td>
+                            <td>{{ t('transactions.' ~ transaction[4]) }}</td>
+                            <td>{{ t('category.' ~ transaction[5]) }}</td>
+                            <td>{{ transaction_actions(transaction) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="transaction-cards">
             {% for transaction in transactions %}
-                <tr>
-                    <td>{{ transaction[0] }}</td>
-                    <td>{{ transaction[1] }}</td>
-                    <td>{{ transaction[2] }}</td>
-                    <td>{{ "%.2f"|format(transaction[3]) }}</td>
-                    <td>
-                        {% if transaction[4] == "income" %}
-                            <span class="type-badge income-badge">{{ t('transactions.income') }}</span>
-                        {% else %}
-                            <span class="type-badge expense-badge">{{ t('transactions.expense') }}</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ t('category.' ~ transaction[5]) }}</td>
-                    <td>
-                        <a href="{{ url_for('transactions.edit', transaction_id=transaction[0]) }}">
-                            {{ t('transactions.edit') }}
-                        </a>
-
-                        <form
-                            action="{{ url_for('transactions.delete', transaction_id=transaction[0]) }}"
-                            method="POST"
-                            style="display:inline;"
-                        >
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button
-                                type="submit"
-                                onclick="return confirm('{{ t('transactions.delete_confirm') }}');"
-                            >
-                                {{ t('transactions.delete') }}
-                            </button>
-                        </form>
-                    </td>
-                </tr>
+                <article class="transaction-card panel">
+                    <div class="transaction-top">
+                        <h2>{{ transaction[2] }}</h2>
+                        <strong class="{{ transaction[4] }}-text"><bdi>{{ '＋' if transaction[4] == 'income' else '−' }}{{ '%.2f'|format(transaction[3]) }}</bdi> {{ t("ui.currency") }}</strong>
+                    </div>
+                    <p>
+                        <bdi>{{ transaction[1] }}</bdi> · {{ t('category.' ~ transaction[5]) }}
+                    </p>
+                    <p class="transaction-type">
+                        {{ t('transactions.' ~ transaction[4]) }} · <bdi>#{{ transaction[0] }}</bdi>
+                    </p>
+                {{ transaction_actions(transaction) }}</article>
             {% endfor %}
-        </tbody>
-    </table>
-</div>
-{% else %}
-    <p>{{ t('transactions.none_found') }}</p>
-{% endif %}
-
-<p>
-    <a href="{{ url_for('dashboard.home') }}">{{ t('transactions.back_to_dashboard') }}</a>
-</p>
+        </div>
+    {% elif search or category or transaction_type %}
+        {{ empty(t('transactions.none_found') ,t('ui.filtered_help'),t('transactions.clear'),url_for('transactions.index'),heading='h2') }}
+    {% else %}
+        {{ empty(t('ui.no_transactions') ,t('ui.transactions_help'),t('nav.add_transaction'),url_for('transactions.add'),heading='h2') }}
+    {% endif %}
 {% endblock %}

@@ -1,110 +1,87 @@
 {% extends "base.html" %}
-
-{% block title %}{{ t('edit.title') }}{% endblock %}
-
+{% block title %}{{ t("edit.title") }}{% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 {% endblock %}
-
 {% block content %}
-
-<div class="form-page">
-
-    <div class="form-heading">
-        <p class="eyebrow">{{ t('edit.eyebrow') }}</p>
-        <h1>{{ t('edit.title') }}</h1>
-        <p>{{ t('edit.subtitle') }}</p>
+    <div class="form-page">
+        <div class="form-heading">
+            <h1>{{ t("edit.title") }}</h1>
+            <p>{{ t("edit.subtitle") }}</p>
+        </div>
+        <form class="transaction-form entry-form" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <h2>{{ t("ui.transaction_details") }}</h2>
+            <div class="form-group">
+                <label for="source">{{ t("form.source") }}</label>
+                <input id="source"
+                       type="text"
+                       name="source"
+                       value="{{ request.form.get('source', transaction[2]) }}"
+                       required>
+            </div>
+            <div class="field-pair">
+                <div class="form-group">
+                    <label for="date">{{ t("form.date") }}</label>
+                    <input id="date"
+                           name="date"
+                           value="{{ request.form.get('date', transaction[1]) }}"
+                           placeholder="{{ t('form.date_placeholder') }}"
+                           autocomplete="off"
+                           required>
+                </div>
+                <div class="form-group">
+                    <label for="amount">{{ t("form.amount") }}</label>
+                    <input id="amount"
+                           type="number"
+                           inputmode="decimal"
+                           step="0.01"
+                           name="amount"
+                           value="{{ request.form.get('amount', transaction[3]) }}"
+                           required>
+                </div>
+            </div>
+            <div class="field-pair">
+                <div class="form-group">
+                    <label for="type">{{ t("form.type") }}</label>
+                    <select id="type" name="type" required>
+                        <option value="income"
+                                {% if request.form.get('type', transaction[4]) == "income" %}selected{% endif %}>
+                            {{ t("transactions.income") }}
+                        </option>
+                        <option value="expense"
+                                {% if request.form.get('type', transaction[4]) == "expense" %}selected{% endif %}>
+                            {{ t("transactions.expense") }}
+                        </option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="category">{{ t("form.category") }}</label>
+                    <select id="category" name="category" required>
+                        {% for category in categories %}
+                            <option value="{{ category }}"
+                                    {% if request.form.get('category', transaction[5]) == category %}selected{% endif %}>
+                                {{ t('category.' ~ category) }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="form-submit" type="submit">{{ t("edit.submit") }}</button>
+                <a class="form-cancel" href="{{ url_for('transactions.index') }}">{{ t("form.cancel") }}</a>
+            </div>
+            <p class="form-help">{{ t("ui.required_fields") }}</p>
+        </form>
     </div>
-
-    <form class="transaction-form" method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-        <div class="form-group">
-            <label for="date">{{ t('form.date') }}</label>
-            <input
-                id="date"
-                name="date"
-                value="{{ transaction[1] }}"
-                placeholder="{{ t('form.date_placeholder') }}"
-                autocomplete="off"
-                required
-            >
-        </div>
-
-        <div class="form-group">
-            <label for="source">{{ t('form.source') }}</label>
-            <input
-                id="source"
-                type="text"
-                name="source"
-                value="{{ transaction[2] }}"
-                required
-            >
-        </div>
-
-        <div class="form-group">
-            <label for="amount">{{ t('form.amount') }}</label>
-            <input
-                id="amount"
-                type="number"
-                step="0.01"
-                name="amount"
-                value="{{ transaction[3] }}"
-                required
-            >
-        </div>
-
-        <div class="form-group">
-            <label for="type">{{ t('form.type') }}</label>
-            <select id="type" name="type" required>
-                <option value="income"
-                    {% if transaction[4] == "income" %}selected{% endif %}>
-                    {{ t('transactions.income') }}
-                </option>
-
-                <option value="expense"
-                    {% if transaction[4] == "expense" %}selected{% endif %}>
-                    {{ t('transactions.expense') }}
-                </option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label for="category">{{ t('form.category') }}</label>
-            <select id="category" name="category" required>
-                {% for category in categories %}
-                    <option value="{{ category }}"
-                        {% if transaction[5] == category %}selected{% endif %}>
-                        {{ t('category.' ~ category) }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="form-actions">
-            <button class="form-submit" type="submit">
-                {{ t('edit.submit') }}
-            </button>
-
-            <a class="form-cancel" href="{{ url_for('transactions.index') }}">
-                {{ t('form.cancel') }}
-            </a>
-        </div>
-
-    </form>
-
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-{% if lang == 'ar' %}
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ar.js"></script>
-{% endif %}
-<script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    {% if lang == 'ar' %}<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ar.js"></script>{% endif %}
+    <script>
     flatpickr("#date", {
         dateFormat: "Y-m-d",
         allowInput: true,
         locale: "{{ lang if lang == 'ar' else 'default' }}"
     });
-</script>
-
+    </script>
 {% endblock %}

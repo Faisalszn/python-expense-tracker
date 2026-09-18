@@ -1,50 +1,38 @@
-{# Expects `budget` (dict from get_budget_status) and optional `show_remove`. #}
-<div class="budget-card {% if budget.over_budget %}budget-over{% endif %}">
-    <div class="budget-card-header">
-        <span class="budget-category">{{ t('category.' ~ budget.category) }}</span>
-
-        {% if show_remove %}
-            <form
-                action="{{ url_for('budgets.delete', category=budget.category) }}"
-                method="POST"
-            >
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button
-                    type="submit"
-                    onclick="return confirm('{{ t('budget.remove_confirm') }}');"
-                >
-                    {{ t('budget.remove') }}
-                </button>
-            </form>
-        {% endif %}
-    </div>
-
-    <div class="budget-progress-track">
-        <div
-            class="budget-progress-fill"
-            style="width: {{ budget.display_percentage }}%;"
-        ></div>
-    </div>
-
-    <div class="budget-figures">
-        <span>
-            {{ "%.2f"|format(budget.spent) }}
-            <span class="riyal-icon">﷼</span> {{ t('budget.spent_suffix') }}
-        </span>
-
-        <span>
-            {{ t('budget.of') }} {{ "%.2f"|format(budget.limit) }}
-            <span class="riyal-icon">﷼</span>
-        </span>
-    </div>
-
+{# Existing get_budget_status data and optional show_remove; no new calculations. #}
+<article class="budget-card {% if budget.over_budget %}budget-over{% endif %}">
+    <h3 class="budget-category">{{ t('category.' ~ budget.category) }}</h3>
+    <p class="budget-figures">
+        <bdi>{{ '%.2f'|format(budget.spent) }}</bdi> {{ t("ui.currency") }} {{ t("budget.spent_suffix") }} {{ t("budget.of") }} <bdi>{{ '%.2f'|format(budget.limit) }}</bdi> {{ t("ui.currency") }}
+    </p>
     {% if budget.over_budget %}
         <p class="budget-warning">
-            {{ t('budget.over_by') }} {{ "%.2f"|format(budget.spent - budget.limit) }} ﷼
+            {{ t("budget.over_by") }} <bdi>{{ '%.2f'|format(budget.spent - budget.limit) }}</bdi> {{ t("ui.currency") }} · <bdi>{{ '%.0f'|format(budget.percentage) }}%</bdi>
         </p>
     {% else %}
         <p class="budget-remaining">
-            {{ "%.2f"|format(budget.remaining) }} ﷼ {{ t('budget.remaining_suffix') }}
+            <bdi>{{ '%.2f'|format(budget.remaining) }}</bdi> {{ t("ui.currency") }} {{ t("budget.remaining_suffix") }} · <bdi>{{ '%.0f'|format(budget.percentage) }}%</bdi>
         </p>
     {% endif %}
-</div>
+    <div class="budget-progress-track"
+         role="progressbar"
+         aria-label="{{ t('category.' ~ budget.category) }}"
+         aria-valuemin="0"
+         aria-valuemax="100"
+         aria-valuenow="{{ budget.display_percentage }}"
+         aria-valuetext="{{ '%.0f'|format(budget.percentage) }}%{% if budget.over_budget %} — {{ t("budget.over_by") }} {{ '%.2f'|format(budget.spent - budget.limit) }} {{ t("ui.currency") }}{% endif %}">
+        <div class="budget-progress-fill"
+             style="width: {{ budget.display_percentage }}%"></div>
+    </div>
+    {% if show_remove %}
+        <form action="{{ url_for('budgets.delete', category=budget.category) }}"
+              method="POST"
+              class="budget-remove">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn-secondary"
+                    type="submit"
+                    onclick="return confirm('{{ t("budget.remove_confirm") }}');">
+                {{ t("budget.remove") }}<span class="sr-only">: {{ t('category.' ~ budget.category) }}</span>
+            </button>
+        </form>
+    {% endif %}
+</article>

@@ -1,53 +1,34 @@
 {% extends "base.html" %}
-
-{% block title %}{{ t('login.title') }}{% endblock %}
-
+{% block title %}{{ t("login.title") }}{% endblock %}
 {% block content %}
-
-<div class="form-page">
-
-    <div class="form-heading">
-        <p class="eyebrow">{{ t('login.eyebrow') }}</p>
-        <h1>{{ t('login.title') }}</h1>
-        <p>{{ t('login.subtitle') }}</p>
+    <div class="form-page auth-card">
+        <div class="form-heading">
+            <h1>{{ t("ui.welcome") }}</h1>
+            <p>{{ t("login.subtitle") }}</p>
+        </div>
+        <form class="transaction-form" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="username">{{ t("login.username") }}</label>
+                <input id="username"
+                       type="text"
+                       name="username"
+                       autocomplete="username"
+                       required
+                       autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">{{ t("login.password") }}</label>
+                <input id="password"
+                       type="password"
+                       name="password"
+                       autocomplete="current-password"
+                       required>
+            </div>
+            <div class="form-actions">
+                <button class="form-submit" type="submit">{{ t("login.submit") }}</button>
+                <a class="form-cancel" href="{{ url_for('auth.register') }}">{{ t("login.create_account_link") }}</a>
+            </div>
+        </form>
     </div>
-
-    <form class="transaction-form" method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-        <div class="form-group">
-            <label for="username">{{ t('login.username') }}</label>
-            <input
-                id="username"
-                type="text"
-                name="username"
-                required
-                autofocus
-            >
-        </div>
-
-        <div class="form-group">
-            <label for="password">{{ t('login.password') }}</label>
-            <input
-                id="password"
-                type="password"
-                name="password"
-                required
-            >
-        </div>
-
-        <div class="form-actions">
-            <button class="form-submit" type="submit">
-                {{ t('login.submit') }}
-            </button>
-
-            <a class="form-cancel" href="{{ url_for('auth.register') }}">
-                {{ t('login.create_account_link') }}
-            </a>
-        </div>
-
-    </form>
-
-</div>
-
 {% endblock %}
