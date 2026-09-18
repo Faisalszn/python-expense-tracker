@@ -261,7 +261,17 @@ pip install -r requirements.txt
 cp .env.example .env
 # edit .env with your database credentials
 
-python app.py
+python migrate.py   # applies any pending database migrations
+python app.py       # starts the Flask development server
+```
+
+### Running in Production
+
+`python app.py` runs Flask's development server, which isn't meant to serve real traffic. In production, Gunicorn runs the app instead, and migrations are applied as their own step beforehand rather than automatically on startup — otherwise every Gunicorn worker process would race to apply them when it boots.
+
+```bash
+python migrate.py
+gunicorn app:app
 ```
 
 ### Running Tests
