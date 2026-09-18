@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: mizan
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    preDeployCommand: python migrate.py
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mizan-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: PYTHON_VERSION
+        value: "3.11.15"
+
+databases:
+  - name: mizan-db
+    plan: basic-256mb
+    postgresMajorVersion: "16"
