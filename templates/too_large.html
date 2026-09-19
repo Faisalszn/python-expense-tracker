@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% from '_ui.html' import empty with context %}
+{% block title %}{{ t("error.too_large_title") }}{% endblock %}
+{% block content %}
+    {{ empty(t('error.too_large_title'), t('error.file_too_large', size=size), heading='h2') }}
+{% endblock %}

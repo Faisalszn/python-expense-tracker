@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 import psycopg2
@@ -8,13 +7,14 @@ from blueprints.auth import login_required
 from constants import CATEGORIES
 from db import get_connection
 from i18n import t
+from services.analytics import month_bounds
 
 budgets_bp = Blueprint("budgets", __name__)
 
 
 def get_budget_status(user_id):
     """Return each budget's monthly limit alongside spending for the current month."""
-    current_month = datetime.now().strftime("%Y-%m")
+    start, end = month_bounds()
 
     try:
         with get_connection() as connection:
@@ -37,10 +37,11 @@ def get_budget_status(user_id):
                 FROM transactions
                 WHERE type = 'expense'
                     AND user_id = %s
-                    AND TO_CHAR(date, 'YYYY-MM') = %s
+                    AND date >= %s
+                    AND date < %s
                 GROUP BY category
                 """,
-                (user_id, current_month)
+                (user_id, start, end)
             )
             spending_by_category = dict(cursor.fetchall())
     except psycopg2.Error as e:

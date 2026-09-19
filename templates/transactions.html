@@ -7,7 +7,15 @@
             <h1>{{ t("transactions.title") }}</h1>
             <p>{{ t("transactions.subtitle") }}</p>
         </div>
-        <a class="btn-primary" href="{{ url_for('transactions.add') }}">{{ t("nav.add_transaction") }}</a>
+        <div class="page-actions">
+            <a class="btn-primary" href="{{ url_for('transactions.add') }}">{{ t("nav.add_transaction") }}</a>
+            <a class="btn-secondary" href="{{ url_for('imports.upload') }}">{{ t("transactions.import") }}</a>
+            {% if transactions %}
+                {# Carries the filters in use, so the file matches the list on screen. #}
+                <a class="btn-secondary"
+                   href="{{ url_for('transactions.export', **active_filters) }}">{{ t("transactions.export") }}</a>
+            {% endif %}
+        </div>
     </header>
     <form method="GET"
           action="{{ url_for('transactions.index') }}"

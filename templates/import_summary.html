@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ t("summary.title") }}{% endblock %}
+{% block content %}
+    <header class="page-heading">
+        <div>
+            <h1>{{ t("summary.title") }}</h1>
+            <p>{{ t("summary.subtitle") }}</p>
+            <p class="section-description">
+                <bdi>{{ record.filename }}</bdi> · <bdi>{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</bdi>
+            </p>
+        </div>
+        <div class="page-actions">
+            <a class="btn-primary" href="{{ url_for('transactions.index') }}">{{ t("summary.view_transactions") }}</a>
+            <a class="btn-secondary" href="{{ url_for('imports.upload') }}">{{ t("summary.import_another") }}</a>
+            <a class="btn-secondary" href="{{ url_for('imports.history') }}">{{ t("history.view") }}</a>
+        </div>
+    </header>
+    <p class="summary-status status-{{ record.status }}">{{ t("summary.status_" ~ record.status) }}</p>
+    <div class="preview-summary">
+        {% for key, count, kind in [('summary.imported', record.successful_rows, 'valid'), ('preview.invalid', record.failed_rows, 'invalid'), ('preview.duplicates', record.duplicate_rows, 'duplicate')] %}
+            <section class="preview-count preview-{{ kind }}">
+                <h2>{{ t(key) }}</h2>
+                <p>
+                    <bdi>{{ count }}</bdi>
+                </p>
+            </section>
+        {% endfor %}
+    </div>
+    {% if record.errors %}
+        <section class="panel">
+            <h2>{{ t("summary.skipped_heading") }}</h2>
+            <p class="section-description">{{ t("summary.skipped_help") }}</p>
+            <div class="table-container">
+                <table>
+                    <caption class="sr-only">{{ t("summary.skipped_heading") }}</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">{{ t("preview.th_row") }}</th>
+                            <th scope="col">{{ t("summary.th_reason") }}</th>
+                            <th scope="col">{{ t("summary.th_content") }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for error in record.errors %}
+                            <tr>
+                                <th scope="row">
+                                    <bdi>{{ error.row_number }}</bdi>
+                                </th>
+                                <td>{{ t(error.error_key) }}</td>
+                                <td class="source-cell">{{ error.raw_row }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% endif %}
+{% endblock %}

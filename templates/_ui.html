@@ -7,9 +7,9 @@
     </a>
 {%- endmacro %}
 {% macro links() -%}
-    {% for endpoint, key in [('dashboard.home','dashboard'),('transactions.index','transactions'),('transactions.add','add_transaction'),('budgets.index','budgets'),('profile.profile','profile')] %}
+    {% for endpoint, key in [('dashboard.home','dashboard'),('transactions.index','transactions'),('transactions.add','add_transaction'),('imports.upload','import'),('budgets.index','budgets'),('profile.profile','profile')] %}
         <a href="{{ url_for(endpoint) }}"
-           {% if request.endpoint == endpoint or (endpoint == 'transactions.index' and request.endpoint == 'transactions.edit') %}aria-current="page"{% endif %}>{{ t('nav.' ~ key) }}</a>
+           {% if request.endpoint == endpoint or (endpoint == 'transactions.index' and request.endpoint == 'transactions.edit') or (endpoint == 'imports.upload' and request.endpoint in ['imports.preview', 'imports.confirm', 'imports.detail', 'imports.history']) %}aria-current="page"{% endif %}>{{ t('nav.' ~ key) }}</a>
     {% endfor %}
 {%- endmacro %}
 {% macro languages() -%}

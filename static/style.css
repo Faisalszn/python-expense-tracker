@@ -200,6 +200,12 @@ main:focus {
     gap: var(--space-24);
 }
 
+.page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-8);
+}
+
 .page-heading p,
 .form-heading p {
     margin-block-start: var(--space-8);
@@ -564,9 +570,237 @@ select:user-invalid {
     color: var(--danger);
 }
 
-.summary-card.balance {
+.summary-card.net {
     background: var(--brown-dark);
     color: var(--surface);
+}
+
+.preview-warning {
+    padding: var(--space-12) var(--space-16);
+    border-radius: var(--radius-card);
+    background: var(--warning-soft);
+    color: var(--warning);
+    font-size: var(--font-small);
+}
+
+.preview-confirm {
+    margin-block-start: var(--space-16);
+}
+
+.form-check {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-8);
+    margin-block-start: var(--space-16);
+}
+
+.form-check input {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+}
+
+.form-check label {
+    font-weight: 600;
+}
+
+.summary-status {
+    font-weight: 600;
+}
+
+.summary-status.status-failed {
+    color: var(--danger);
+}
+
+.summary-status.status-completed {
+    color: var(--success);
+}
+
+.summary-status.status-partial {
+    color: var(--warning);
+}
+
+/* Import: the upload form beside the format it expects, then a preview of
+   every row before anything is written. */
+.import-layout {
+    display: grid;
+    align-items: start;
+    gap: var(--space-24);
+}
+
+.import-sample {
+    margin: 0;
+    padding: var(--space-12);
+    overflow-x: auto;
+    background: var(--surface-soft);
+    border-radius: var(--radius-small);
+    font-size: var(--font-small);
+}
+
+.import-rules {
+    margin-block: var(--space-16) 0;
+    padding-inline-start: var(--space-24);
+    color: var(--text-muted);
+    font-size: var(--font-small);
+}
+
+.import-rules li+li {
+    margin-block-start: var(--space-8);
+}
+
+.preview-summary {
+    display: grid;
+    gap: var(--space-16);
+}
+
+.preview-count {
+    padding: var(--space-16) var(--space-24);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+    border: 1px solid var(--divider);
+}
+
+.preview-count h2 {
+    font: 600 var(--font-small)/20px var(--font-ui);
+}
+
+.preview-count p {
+    margin-block-start: var(--space-4);
+    color: var(--text);
+    font: 600 var(--font-section)/1.3 var(--font-ui);
+}
+
+.preview-count.preview-valid {
+    background: var(--success-soft);
+    border-color: var(--success-soft);
+}
+
+.preview-count.preview-invalid {
+    background: var(--danger-soft);
+    border-color: var(--danger-soft);
+}
+
+.preview-count.preview-duplicate {
+    background: var(--warning-soft);
+    border-color: var(--warning-soft);
+}
+
+.preview-note {
+    margin-block-start: var(--space-16);
+}
+
+/* Status is always spelled out beside the colour, never carried by it alone. */
+.preview-status {
+    display: block;
+    font-weight: 600;
+    font-size: var(--font-small);
+}
+
+.preview-error {
+    display: block;
+    color: var(--text-muted);
+    font-size: var(--font-small);
+}
+
+.status-valid {
+    color: var(--success);
+}
+
+.status-invalid {
+    color: var(--danger);
+}
+
+.status-duplicate {
+    color: var(--warning);
+}
+
+.preview-table tr.preview-row-invalid td,
+.preview-table tr.preview-row-invalid th {
+    background: var(--danger-soft);
+}
+
+.preview-table tr.preview-row-duplicate td,
+.preview-table tr.preview-row-duplicate th {
+    background: var(--warning-soft);
+}
+
+@media (width >= 600px) {
+    .preview-summary {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (width >= 960px) {
+    .import-layout {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Insights: a KPI row of stat tiles, deliberately quieter than the three
+   summary cards above so the month's headline figures stay the lead. */
+.insights-section {
+    margin-block-start: var(--space-24);
+}
+
+.insight-grid {
+    display: grid;
+    gap: var(--space-16);
+}
+
+.insight-tile {
+    min-width: 0;
+    padding: var(--space-16);
+    border: 1px solid var(--divider);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+}
+
+.insight-tile h3 {
+    margin: 0;
+    color: var(--text-muted);
+    font: 600 var(--font-small)/20px var(--font-ui);
+}
+
+/* Proportional figures on purpose: these are standalone values, not a column
+   that has to align vertically. */
+.insight-value {
+    margin-block: var(--space-8) 0;
+    color: var(--text);
+    font: 600 var(--font-section)/1.3 var(--font-ui);
+}
+
+.insight-detail {
+    margin-block-start: var(--space-4);
+    color: var(--text-muted);
+    font-size: var(--font-small);
+}
+
+.insight-empty {
+    color: var(--text-muted);
+    font: 400 var(--font-body)/1.5 var(--font-ui);
+}
+
+/* Status colour, reserved for the one figure that has a good and a bad
+   direction. The arrow and the word beside it say the same thing, so colour
+   is never the only channel. */
+.insight-value.spending-up {
+    color: var(--danger);
+}
+
+.insight-value.spending-down {
+    color: var(--success);
+}
+
+@media (width >= 600px) {
+    .insight-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (width >= 960px) {
+    .insight-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
 }
 
 .analytics-grid {

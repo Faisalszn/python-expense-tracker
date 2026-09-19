@@ -425,3 +425,94 @@ FLASK_DEBUG=0
 - Why a pre-deploy step is worth paying for: it turns "the migration failed" into "the deploy failed, the old version is still serving traffic," instead of "a worker crashed on boot" or, worse, "workers are running against half-migrated tables"
 - Why `DATABASE_URL` should point at the internal network route rather than the public one when both services share a region — it's both faster and keeps database traffic off the public internet
 - That environment-driven configuration is what actually makes "the same code, three environments" (local, CI, production) possible — nothing in the code branches on which environment it's running in beyond reading `FLASK_ENV`
+## Version 13 – Transaction Data Pipeline and Monthly Insights
+
+Every version up to V12 assumed transactions arrive one form submission at a time. V13 adds the other two directions — a CSV in and a CSV out — and changes what the dashboard means by "your money": not everything you have ever recorded, but this month.
+
+### New Features
+- Import transactions from a CSV file, with a preview of every row before anything is written
+- Export transactions to CSV, honouring whatever filters the transactions page has applied
+- An import history listing what each file added, skipped, and flagged, with a per-import summary
+- A month-scoped dashboard summary: September Income, September Spending, September Net
+- Five deterministic monthly insights: spending against last month, top category, average expense, largest expense, and budget utilisation
+
+### The Import Flow
+
+```text
+Upload  →  Parse  →  Validate  →  Preview  →  Confirm  →  Summary
+                                     ↑                       │
+                              nothing written          one transaction
+```
+
+Uploading never writes. The preview shows every row with its normalised values and a status of valid, invalid, or duplicate, and confirming re-runs the entire pipeline over the original bytes rather than trusting what the browser was holding. The import itself is a single database transaction: the batch record, its transactions and its row errors all land together or none of them do.
+
+Valid rows import even when others are invalid. A preview that reports "27 valid, 3 invalid" and then imports nothing would be a preview of nothing, and one typo on row 400 should not block 399 good rows.
+
+### The CSV Contract
+
+One format, `date,source,amount,type,category`, in that order:
+
+```text
+date,source,amount,type,category
+2026-09-01,Carrefour,420.00,expense,Groceries
+2026-09-02,Salary,12500.00,income,Salary
+```
+
+Header names are matched ignoring case and surrounding spaces, and extra columns are ignored. Anything more forgiving than that — guessing which column is the amount, parsing several date formats, stripping currency symbols — is column mapping, which V13 deliberately does not do. A row that would need it is reported as invalid so the file can be corrected, rather than silently interpreted.
+
+### One Set of Validation Rules
+
+The rules live in `services/transaction_rules.py`, with no Flask, no psycopg2 and no request context, and both entry points call them: the Add and Edit forms through a two-line adapter, and the importer per row. A row rejected by the importer would have been rejected by the form, and reports the same reason in the same words.
+
+Extracting them was checked rather than assumed — the old and new validators were run against 115,500 combinations of adversarial field values, agreeing on all but the one deliberate change (a category now matches its canonical spelling case-insensitively, since a CSV supplies categories as free text where the forms use a `<select>`).
+
+### Duplicate Protection
+
+Re-importing a file you have already imported adds nothing. Detection compares a canonical key — user, date, source, amount, type and category — computed fresh for each import and never stored, so there is no derived column to migrate, backfill, or keep in step when a transaction is later edited.
+
+Because the key only has to compare equal to another key, it can normalise harder than the values that actually get stored, which is what makes three real mismatches collapse:
+
+- a row stored before V13 holding the doubled space someone typed, against a tidier CSV row
+- a CSV amount of `419.999` against the `420.00` the `NUMERIC(12, 2)` column rounded it to
+- `2026-9-1` against the `2026-09-01` the `DATE` column stores
+
+The lookup is narrowed to the dates the file covers, so it is one indexed read rather than a scan of the account's history.
+
+Detection is advisory, never a constraint. Two coffees at the same shop on the same day for the same price are a real pair of transactions, so the later row is flagged and skipped by default, with an explicit checkbox to import it anyway. A unique index would have made that second coffee permanently unrecordable — data loss wearing the costume of data hygiene.
+
+### The Monthly Dashboard Change
+
+Historical transactions are never deleted or reset. What changed is what the summary covers: the three headline figures are the current calendar month, and they roll over on their own when a new one starts. Everything earlier stays in the transactions list, the CSV export, and the multi-month trend chart — which is still whole-history, and is what demonstrates the summary discards nothing.
+
+The third figure is **Net**, not Balance. It is one month's income minus that month's spending, and calling it a balance would misrepresent it the moment earlier months stopped contributing. Aggregates read as income, spending and net throughout; income and expense stay as the names of the two transaction types.
+
+Where "this month" begins and ends now has one definition, `services/analytics.month_bounds()`, returning a half-open `[start, end)` range. Before V13 each caller worked it out separately, which is how the dashboard came to report all-time totals while the Budgets page reported monthly ones.
+
+### Schema Changes
+
+```text
+0003  transactions (user_id, date) index      — backs every month-scoped query
+0004  import_batches, import_row_errors       — what each import did, and why rows were skipped
+      transactions.import_id                  — provenance, ON DELETE SET NULL
+```
+
+`import_id` is `SET NULL` rather than `CASCADE`: import history is a receipt, and throwing away a receipt must never throw away the money it describes.
+
+`import_row_errors` stores a translation key rather than a rendered sentence, so an error recorded while the interface was in English still reads correctly in Arabic.
+
+### Security
+
+- Every import, export and history query is scoped to the session's user. Another account's import is a 404, not a 403 — confirming an id exists leaks more than refusing to discuss it.
+- Uploads are bounded by a 2 MB request limit and a 2,000-row cap, and are read in memory: never written to disk, never executed. The `.csv` extension check is a courtesy to the user; the actual defence is that the bytes are only ever UTF-8 decoded and handed to a CSV reader.
+- Filenames are reduced to a displayable string — directory components and unprintable characters removed, length bounded — rather than passed through `secure_filename`, which strips every non-ASCII character and would turn an Arabic filename into `csv`. Nothing here reaches a filesystem, so there is no path to traverse.
+- Raw CSV is never stored. Only the derived rows, a SHA-256 of the upload for the repeated-file warning, and a truncated copy of any line that failed.
+- CSRF, authentication, session cookie flags and account lockout are unchanged, and the new routes are covered by the same tests as the old ones.
+
+### What I Learned
+- That a derived value is cheapest when it is not stored: dropping the fingerprint column removed a migration, a backfill, a drift risk between SQL and Python, and the question of what to do when an edited transaction's stored fingerprint goes stale — and cost one indexed query
+- Why a duplicate check belongs in the interface rather than in a unique index: the database cannot tell an accidental double import from two identical coffees, and the one that guesses wrong deletes real data
+- That "the preview said so" is not a fact the server may rely on — the page has been in the browser's hands, and the database may have changed underneath it, so confirming has to re-derive everything
+- Why an audit record of a failed import has to be written in its own transaction: inside the batch it would roll back with everything else, leaving no trace; written carelessly afterwards it could claim rows that were never inserted
+- That a half-written import is worse than a failed one, because a history row claiming transactions that are not there has to be reconciled by hand
+- How much of bilingual support is bidirectional isolation rather than translation — a Latin filename or an ISO date dropped into an Arabic sentence reorders on screen unless it is isolated
+- That running the code and reading the output catches what tests do not: two history columns both headed "Imported", an empty detail line under an average, and `secure_filename` quietly reducing an Arabic filename to `csv` were all found by looking, not by asserting

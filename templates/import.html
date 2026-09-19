@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ t("import.title") }}{% endblock %}
+{% block content %}
+    <header class="page-heading">
+        <div>
+            <h1>{{ t("import.title") }}</h1>
+            <p>{{ t("import.subtitle") }}</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn-secondary" href="{{ url_for('imports.history') }}">{{ t("history.view") }}</a>
+            <a class="btn-secondary" href="{{ url_for('transactions.index') }}">{{ t("transactions.title") }}</a>
+        </div>
+    </header>
+    {% if size_error %}
+        <ul class="flash-message" role="alert">
+            <li>{{ t("error.file_too_large", size=size_error) }}</li>
+        </ul>
+    {% endif %}
+    <div class="import-layout">
+        <form class="transaction-form"
+              method="POST"
+              action="{{ url_for('imports.preview') }}"
+              enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <h2>{{ t("import.choose_heading") }}</h2>
+            <div class="form-group">
+                <label for="file">{{ t("import.choose_file") }}</label>
+                <input id="file" type="file" name="file" accept=".csv,text/csv" required>
+            </div>
+            <div class="form-actions">
+                <button class="form-submit" type="submit">{{ t("import.submit") }}</button>
+                <a class="form-cancel" href="{{ url_for('transactions.index') }}">{{ t("form.cancel") }}</a>
+            </div>
+            <p class="form-help">{{ t("import.nothing_saved_yet") }}</p>
+        </form>
+        <section class="panel import-format">
+            <h2>{{ t("import.format_heading") }}</h2>
+            <p class="section-description">{{ t("import.format_help") }}</p>
+            <pre class="import-sample"><code>date,source,amount,type,category
+2026-09-01,Carrefour,420.00,expense,Groceries
+2026-09-02,Salary,12500.00,income,Salary</code></pre>
+            <ul class="import-rules">
+                <li>{{ t("import.rule_date") }}</li>
+                <li>{{ t("import.rule_amount") }}</li>
+                <li>{{ t("import.rule_type") }}</li>
+                <li>{{ t("import.rule_category", categories=categories|join(', ')) }}</li>
+                <li>{{ t("import.rule_limits", rows=max_rows) }}</li>
+            </ul>
+        </section>
+    </div>
+{% endblock %}
