@@ -1,10 +1,13 @@
+from datetime import date
+
 import psycopg2
-from flask import Blueprint, flash, redirect, render_template, request, session
+from flask import Blueprint, Response, flash, redirect, render_template, request, session
 
 from blueprints.auth import login_required
 from constants import CATEGORIES
 from db import get_connection
 from i18n import t
+from services.csv_export import export_csv
 from services.transaction_rules import TRANSACTION_FIELDS, normalize_and_validate
 
 transactions_bp = Blueprint("transactions", __name__)
@@ -216,20 +219,57 @@ def get_monthly_spending(user_id):
         return []
 
 
+def read_filters():
+    """Read the transaction filters from the query string.
+
+    Shared by the list and the export so a download can never cover a
+    different set of rows than the page it was started from.
+    """
+    return {
+        "search": request.args.get("search", "").strip(),
+        "category": request.args.get("category", "").strip(),
+        "type": request.args.get("type", "").strip(),
+    }
+
+
 @transactions_bp.route("/transactions")
 @login_required
 def index():
-    search = request.args.get("search", "").strip()
-    category = request.args.get("category", "").strip()
-    transaction_type = request.args.get("type", "").strip()
+    filters = read_filters()
 
     return render_template(
         "transactions.html",
-        transactions=get_transactions(session["user_id"], search, category, transaction_type),
-        search=search,
-        category=category,
-        transaction_type=transaction_type,
+        transactions=get_transactions(
+            session["user_id"], filters["search"], filters["category"], filters["type"]
+        ),
+        search=filters["search"],
+        category=filters["category"],
+        transaction_type=filters["type"],
+        # Only the filters actually in use, so the export link stays clean.
+        active_filters={key: value for key, value in filters.items() if value},
         categories=CATEGORIES
+    )
+
+
+@transactions_bp.route("/transactions/export.csv")
+@login_required
+def export():
+    filters = read_filters()
+
+    # Fetched before the response starts rather than from inside the generator:
+    # a database error has to surface as an error page, not as a truncated file
+    # the browser has already begun saving.
+    transactions = get_transactions(
+        session["user_id"], filters["search"], filters["category"], filters["type"]
+    )
+
+    filename = f"mizan-transactions-{date.today().isoformat()}.csv"
+    return Response(
+        export_csv(transactions),
+        headers={
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
     )
 
 
