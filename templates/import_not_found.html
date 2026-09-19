@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% from '_ui.html' import empty with context %}
+{% block title %}{{ t("summary.not_found") }}{% endblock %}
+{% block content %}
+    {{ empty(t('summary.not_found'), t('summary.not_found_help'), t('import.title'), url_for('imports.upload'), heading='h2') }}
+{% endblock %}

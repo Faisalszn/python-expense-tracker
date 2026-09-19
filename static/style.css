@@ -575,6 +575,51 @@ select:user-invalid {
     color: var(--surface);
 }
 
+.preview-warning {
+    padding: var(--space-12) var(--space-16);
+    border-radius: var(--radius-card);
+    background: var(--warning-soft);
+    color: var(--warning);
+    font-size: var(--font-small);
+}
+
+.preview-confirm {
+    margin-block-start: var(--space-16);
+}
+
+.form-check {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-8);
+    margin-block-start: var(--space-16);
+}
+
+.form-check input {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+}
+
+.form-check label {
+    font-weight: 600;
+}
+
+.summary-status {
+    font-weight: 600;
+}
+
+.summary-status.status-failed {
+    color: var(--danger);
+}
+
+.summary-status.status-completed {
+    color: var(--success);
+}
+
+.summary-status.status-partial {
+    color: var(--warning);
+}
+
 /* Import: the upload form beside the format it expects, then a preview of
    every row before anything is written. */
 .import-layout {

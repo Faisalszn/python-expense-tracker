@@ -9,6 +9,7 @@
         </div>
         <div class="page-actions">
             <a class="btn-primary" href="{{ url_for('transactions.add') }}">{{ t("nav.add_transaction") }}</a>
+            <a class="btn-secondary" href="{{ url_for('imports.upload') }}">{{ t("transactions.import") }}</a>
             {% if transactions %}
                 {# Carries the filters in use, so the file matches the list on screen. #}
                 <a class="btn-secondary"

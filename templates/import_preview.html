@@ -10,6 +10,11 @@
             <a class="btn-secondary" href="{{ url_for('imports.upload') }}">{{ t("preview.back") }}</a>
         </div>
     </header>
+    {% if previously_imported_at %}
+        <p class="preview-warning" role="status">
+            {{ t("preview.already_imported", date=previously_imported_at.strftime('%Y-%m-%d')) }}
+        </p>
+    {% endif %}
     <div class="preview-summary">
         {% for key, count, kind in [('preview.valid', preview.valid_count, 'valid'), ('preview.invalid', preview.invalid_count, 'invalid'), ('preview.duplicates', preview.duplicate_count, 'duplicate')] %}
             <section class="preview-count preview-{{ kind }}">
@@ -20,13 +25,34 @@
             </section>
         {% endfor %}
     </div>
-    <p class="preview-note">
-        {% if preview.valid_count %}
-            {{ t("preview.ready", count=preview.valid_count) }}
-        {% else %}
-            {{ t("preview.nothing_to_import") }}
+    <form class="preview-confirm panel" method="POST" action="{{ url_for('imports.confirm') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="payload" value="{{ payload }}">
+        <input type="hidden" name="filename" value="{{ filename }}">
+        <p class="preview-note">
+            {% if preview.valid_count or preview.duplicate_count %}
+                {{ t("preview.ready", count=preview.valid_count) }}
+            {% else %}
+                {{ t("preview.nothing_to_import") }}
+            {% endif %}
+        </p>
+        {% if preview.duplicate_count %}
+            <div class="form-check">
+                <input id="include_duplicates"
+                       type="checkbox"
+                       name="include_duplicates"
+                       value="yes">
+                <label for="include_duplicates">{{ t("preview.include_duplicates", count=preview.duplicate_count) }}</label>
+            </div>
+            <p class="form-help">{{ t("preview.include_duplicates_help") }}</p>
         {% endif %}
-    </p>
+        {% if preview.valid_count or preview.duplicate_count %}
+            <div class="form-actions">
+                <button class="form-submit" type="submit">{{ t("preview.confirm") }}</button>
+                <a class="form-cancel" href="{{ url_for('imports.upload') }}">{{ t("form.cancel") }}</a>
+            </div>
+        {% endif %}
+    </form>
     <div class="table-container">
         <table class="preview-table">
             <caption class="sr-only">{{ t("preview.title") }}</caption>
