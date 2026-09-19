@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from '_ui.html' import empty with context %}
+{% block title %}{{ t("history.title") }}{% endblock %}
+{% block content %}
+    <header class="page-heading">
+        <div>
+            <h1>{{ t("history.title") }}</h1>
+            <p>{{ t("history.subtitle") }}</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn-primary" href="{{ url_for('imports.upload') }}">{{ t("import.title") }}</a>
+        </div>
+    </header>
+    {% if imports %}
+        <div class="table-container">
+            <table>
+                <caption class="sr-only">{{ t("history.title") }}</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">{{ t("history.th_file") }}</th>
+                        <th scope="col">{{ t("history.th_when") }}</th>
+                        <th scope="col">{{ t("history.th_imported") }}</th>
+                        <th scope="col">{{ t("preview.invalid") }}</th>
+                        <th scope="col">{{ t("preview.duplicates") }}</th>
+                        <th scope="col">{{ t("preview.th_status") }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in imports %}
+                        <tr>
+                            <th scope="row" class="source-cell">
+                                <a href="{{ url_for('imports.detail', import_id=record.id) }}">{{ record.filename }}</a>
+                            </th>
+                            <td>
+                                <bdi>{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</bdi>
+                            </td>
+                            <td>
+                                <bdi>{{ record.successful_rows }}</bdi>
+                            </td>
+                            <td>
+                                <bdi>{{ record.failed_rows }}</bdi>
+                            </td>
+                            <td>
+                                <bdi>{{ record.duplicate_rows }}</bdi>
+                            </td>
+                            <td>
+                                <span class="preview-status status-{{ 'valid' if record.status == 'completed' else ('invalid' if record.status == 'failed' else 'duplicate') }}">{{ t("history.status_" ~ record.status) }}</span>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        {{ empty(t('history.none_yet'), t('history.none_help'), t('import.title'), url_for('imports.upload'), heading='h2') }}
+    {% endif %}
+{% endblock %}

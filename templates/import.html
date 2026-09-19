@@ -7,6 +7,7 @@
             <p>{{ t("import.subtitle") }}</p>
         </div>
         <div class="page-actions">
+            <a class="btn-secondary" href="{{ url_for('imports.history') }}">{{ t("history.view") }}</a>
             <a class="btn-secondary" href="{{ url_for('transactions.index') }}">{{ t("transactions.title") }}</a>
         </div>
     </header>

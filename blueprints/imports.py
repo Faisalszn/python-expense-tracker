@@ -82,6 +82,46 @@ def find_previous_import(user_id, file_hash):
     return row[0] if row else None
 
 
+def get_imports(user_id):
+    """Return the user's imports, newest first.
+
+    Not paginated: importing is an occasional act, so this list stays short
+    for a personal ledger, and the (user_id, created_at DESC) index means
+    reading it never gets more expensive than the rows it returns.
+    """
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                SELECT id, filename, created_at, total_rows, successful_rows,
+                       failed_rows, duplicate_rows, status
+                FROM import_batches
+                WHERE user_id = %s
+                ORDER BY created_at DESC, id DESC
+                """,
+                (user_id,)
+            )
+            rows = cursor.fetchall()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return []
+
+    return [
+        {
+            "id": row[0],
+            "filename": row[1],
+            "created_at": row[2],
+            "total_rows": row[3],
+            "successful_rows": row[4],
+            "failed_rows": row[5],
+            "duplicate_rows": row[6],
+            "status": row[7],
+        }
+        for row in rows
+    ]
+
+
 def get_import(import_id, user_id):
     """Return one import batch with its row errors, or None if not this user's."""
     try:
@@ -385,6 +425,12 @@ def confirm():
 
     flash(t("success.import_complete", count=len(rows_to_import)))
     return redirect(f"/transactions/imports/{import_id}")
+
+
+@imports_bp.route("/transactions/imports")
+@login_required
+def history():
+    return render_template("import_history.html", imports=get_imports(session["user_id"]))
 
 
 @imports_bp.route("/transactions/imports/<int:import_id>")

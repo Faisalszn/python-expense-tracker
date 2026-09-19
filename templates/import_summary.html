@@ -11,6 +11,7 @@
         <div class="page-actions">
             <a class="btn-primary" href="{{ url_for('transactions.index') }}">{{ t("summary.view_transactions") }}</a>
             <a class="btn-secondary" href="{{ url_for('imports.upload') }}">{{ t("summary.import_another") }}</a>
+            <a class="btn-secondary" href="{{ url_for('imports.history') }}">{{ t("history.view") }}</a>
         </div>
     </header>
     <p class="summary-status status-{{ record.status }}">{{ t("summary.status_" ~ record.status) }}</p>
