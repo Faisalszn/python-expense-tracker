@@ -20,6 +20,98 @@
             </section>
         {% endfor %}
     </div>
+    <section class="panel insights-section">
+        <h2>{{ t("dashboard.insights", month=month_name) }}</h2>
+        <p class="section-description">{{ t("dashboard.insights_desc") }}</p>
+        <div class="insight-grid">
+            {% set previous_name = t('month.' ~ previous_month) %}
+            {% set change = insights.spending_change %}
+            <article class="insight-tile">
+                <h3>{{ t("insight.spending_change", month=previous_name) }}</h3>
+                {% if change.percent is none and change.delta == 0 %}
+                    <p class="insight-value insight-empty">{{ t("insight.no_comparison", month=previous_name) }}</p>
+                {% else %}
+                    <p class="insight-value {{ 'spending-up' if change.increased }}{{ 'spending-down' if change.delta < 0 }}">
+                        {# The sign and the word carry the direction; colour only reinforces it. #}
+                        {% if change.delta > 0 %}
+                            <span aria-hidden="true">▲</span> {{ t("insight.spending_up") }}
+                        {% elif change.delta < 0 %}
+                            <span aria-hidden="true">▼</span> {{ t("insight.spending_down") }}
+                        {% endif %}
+                        <bdi>{{ '%.2f'|format(change.delta|abs) }}</bdi> {{ t("ui.currency") }}
+                    </p>
+                    {% if change.delta == 0 %}
+                        <p class="insight-detail">{{ t("insight.spending_same", month=previous_name) }}</p>
+                    {% elif change.percent is not none %}
+                        <p class="insight-detail">
+                            <bdi>{{ '%.1f'|format(change.percent|abs) }}%</bdi>
+                        </p>
+                    {% else %}
+                        <p class="insight-detail">{{ t("insight.no_comparison", month=previous_name) }}</p>
+                    {% endif %}
+                {% endif %}
+            </article>
+            <article class="insight-tile">
+                <h3>{{ t("insight.top_category") }}</h3>
+                {% if insights.top_category %}
+                    <p class="insight-value">{{ t('category.' ~ insights.top_category.category) }}</p>
+                    <p class="insight-detail">
+                        <bdi>{{ '%.2f'|format(insights.top_category.total) }}</bdi> {{ t("ui.currency") }}
+                    </p>
+                {% else %}
+                    <p class="insight-value insight-empty">{{ t("insight.no_expenses") }}</p>
+                {% endif %}
+            </article>
+            <article class="insight-tile">
+                <h3>{{ t("insight.average_expense") }}</h3>
+                {% if insights.average_expense is not none %}
+                    <p class="insight-value">
+                        <bdi>{{ '%.2f'|format(insights.average_expense) }}</bdi> {{ t("ui.currency") }}
+                    </p>
+                    <p class="insight-detail">{{ t("insight.average_expense_detail", count=insights.expense_count) }}</p>
+                {% else %}
+                    <p class="insight-value insight-empty">{{ t("insight.no_expenses") }}</p>
+                {% endif %}
+            </article>
+            <article class="insight-tile">
+                <h3>{{ t("insight.largest_expense") }}</h3>
+                {% if insights.largest_expense %}
+                    <p class="insight-value">
+                        <bdi>{{ '%.2f'|format(insights.largest_expense.amount) }}</bdi> {{ t("ui.currency") }}
+                    </p>
+                    <p class="insight-detail">
+                        {{ insights.largest_expense.source }} · <bdi>{{ insights.largest_expense.date }}</bdi>
+                    </p>
+                {% else %}
+                    <p class="insight-value insight-empty">{{ t("insight.no_expenses") }}</p>
+                {% endif %}
+            </article>
+            {% set budget = insights.budget_utilization %}
+            <article class="insight-tile {% if budget and budget.over_budget %}budget-over{% endif %}">
+                <h3>{{ t("insight.budget_utilization") }}</h3>
+                {% if budget %}
+                    <p class="insight-value">
+                        <bdi>{{ '%.0f'|format(budget.percent) }}%</bdi>
+                    </p>
+                    <p class="insight-detail">
+                        <bdi>{{ '%.2f'|format(budget.spent) }}</bdi> {{ t("ui.currency") }} {{ t("insight.budget_detail", limit='%.2f'|format(budget.limit) ~ ' ' ~ t("ui.currency")) }}
+                    </p>
+                    <div class="budget-progress-track"
+                         role="progressbar"
+                         aria-label="{{ t('insight.budget_utilization') }}"
+                         aria-valuemin="0"
+                         aria-valuemax="100"
+                         aria-valuenow="{{ budget.display_percent }}"
+                         aria-valuetext="{{ '%.0f'|format(budget.percent) }}%">
+                        <div class="budget-progress-fill"
+                             style="width: {{ budget.display_percent }}%"></div>
+                    </div>
+                {% else %}
+                    <p class="insight-value insight-empty">{{ t("insight.no_budgets") }}</p>
+                {% endif %}
+            </article>
+        </div>
+    </section>
     <div class="analytics-grid">
         <section class="panel analytics-section">
             <h2>{{ t("dashboard.spending_by_category") }}</h2>

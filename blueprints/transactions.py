@@ -122,6 +122,73 @@ def get_spending_by_category(user_id, start, end):
         return []
 
 
+def get_expense_stats(user_id, start, end, previous_start):
+    """Return this month's expense total and count, plus last month's total.
+
+    One query rather than three: the two months are adjacent, so a single scan
+    of [previous_start, end) can split them with FILTER.
+    """
+    empty = {"current_total": 0, "current_count": 0, "previous_total": 0}
+
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    COALESCE(SUM(amount) FILTER (WHERE date >= %s), 0),
+                    COUNT(*) FILTER (WHERE date >= %s),
+                    COALESCE(SUM(amount) FILTER (WHERE date < %s), 0)
+                FROM transactions
+                WHERE type = 'expense'
+                    AND user_id = %s
+                    AND date >= %s
+                    AND date < %s
+                """,
+                (start, start, start, user_id, previous_start, end)
+            )
+            current_total, current_count, previous_total = cursor.fetchone()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return empty
+
+    return {
+        "current_total": current_total,
+        "current_count": current_count,
+        "previous_total": previous_total,
+    }
+
+
+def get_largest_expense(user_id, start, end):
+    """Return the biggest single expense in [start, end), or None."""
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                SELECT source, date, amount
+                FROM transactions
+                WHERE type = 'expense'
+                    AND user_id = %s
+                    AND date >= %s
+                    AND date < %s
+                ORDER BY amount DESC, id
+                LIMIT 1
+                """,
+                (user_id, start, end)
+            )
+            row = cursor.fetchone()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return None
+
+    if row is None:
+        return None
+
+    # Ties break on id so the same expense is named on every reload.
+    return {"source": row[0], "date": row[1], "amount": row[2]}
+
+
 def get_monthly_spending(user_id):
     """Return (YYYY-MM, total) expense pairs across the user's whole history.
 

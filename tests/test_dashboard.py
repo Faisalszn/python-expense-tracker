@@ -14,7 +14,7 @@ from datetime import timedelta
 import pytest
 
 from services.analytics import month_bounds
-from tests.helpers import add_transaction, login, register
+from tests.helpers import add_transaction, login, register, set_budget
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +41,22 @@ def summary_cards(body):
     """
     html = body.decode()
     return html[html.index('<div class="summary-grid">'):html.index('<div class="analytics-grid">')]
+
+
+def insights_panel(body):
+    """Just the insights tiles."""
+    html = body.decode()
+    return html[
+        html.index('class="panel insights-section"'):html.index('<div class="analytics-grid">')
+    ]
+
+
+def tile(body, heading):
+    """A single insight tile, found by the text of its heading."""
+    articles = insights_panel(body).split("<article")
+    matches = [a for a in articles if heading in a]
+    assert len(matches) == 1, f"expected exactly one {heading!r} tile, got {len(matches)}"
+    return matches[0]
 
 
 def category_panel(body):
@@ -173,3 +189,138 @@ def test_summary_is_scoped_to_the_logged_in_user(client):
     client.post("/logout")
     login(client)
     assert "5150.00" in summary_cards(client.get("/").data)
+
+
+# --- deterministic monthly insights ------------------------------------------
+
+
+def test_insights_report_top_category_average_and_largest_expense(client):
+    add_transaction(
+        client, date=current_month_day(), amount="300.00", category="Bills", source="Rent",
+        type="expense",
+    )
+    add_transaction(
+        client, date=current_month_day(), amount="60.00", category="Dining", source="Cafe",
+        type="expense",
+    )
+
+    panel = insights_panel(client.get("/").data)
+
+    assert "Bills" in panel            # top category, largest total
+    assert "300.00" in panel           # and the largest single expense
+    assert "Rent" in panel             # named, so it is identifiable
+    assert "180.00" in panel           # average of 300 and 60
+
+
+def test_insights_mark_rising_spending_as_up(client):
+    add_transaction(client, date=previous_month_day(), amount="100.00", type="expense")
+    add_transaction(client, date=current_month_day(), amount="150.00", type="expense")
+
+    panel = insights_panel(client.get("/").data)
+
+    # Direction is carried by the arrow and the word, not by colour alone.
+    assert "spending-up" in panel
+    assert "up" in panel
+    assert "50.00" in panel   # the absolute change
+    assert "50.0%" in panel   # and the proportional one
+
+
+def test_insights_mark_falling_spending_as_down(client):
+    add_transaction(client, date=previous_month_day(), amount="200.00", type="expense")
+    add_transaction(client, date=current_month_day(), amount="150.00", type="expense")
+
+    panel = insights_panel(client.get("/").data)
+
+    assert "spending-down" in panel
+    assert "down" in panel
+    assert "25.0%" in panel
+
+
+def test_insights_withhold_a_percentage_without_a_baseline(client):
+    # Rising from zero is not "up 100%", and the panel must not imply it is.
+    add_transaction(client, date=current_month_day(), amount="150.00", type="expense")
+
+    change_tile = tile(client.get("/").data, "Spending vs")
+
+    assert "to compare against" in change_tile
+    assert "%" not in change_tile  # no percentage is claimed at all
+    assert "150.00" in change_tile  # but the absolute change is still reported
+
+
+def test_insights_report_no_expenses_for_an_empty_month(client):
+    add_transaction(client, date=previous_month_day(), amount="500.00", type="expense")
+
+    body = client.get("/").data
+    panel = insights_panel(body)
+
+    assert panel.count("No expenses this month") == 3  # top, average, largest
+
+    # The spending-change tile still has something true to say: spending fell
+    # by last month's whole total.
+    change_tile = tile(body, "Spending vs")
+    assert "spending-down" in change_tile
+    assert "500.00" in change_tile
+    assert "100.0%" in change_tile
+
+
+def test_budget_utilization_appears_once_a_budget_is_set(client):
+    panel = insights_panel(client.get("/").data)
+    assert "No budgets set" in panel
+
+    set_budget(client, category="Groceries", monthly_limit="400")
+    add_transaction(
+        client, date=current_month_day(), amount="100.00", category="Groceries", type="expense"
+    )
+
+    panel = insights_panel(client.get("/").data)
+    assert "25%" in panel
+    assert "400.00" in panel
+
+
+def test_budget_utilization_can_exceed_the_limit(client):
+    set_budget(client, category="Dining", monthly_limit="100")
+    add_transaction(
+        client, date=current_month_day(), amount="175.00", category="Dining", type="expense"
+    )
+
+    panel = insights_panel(client.get("/").data)
+
+    assert "175%" in panel        # the figure is honest
+    assert "width: 100%" in panel  # the bar stops at full
+    assert "budget-over" in panel
+
+
+def test_largest_expense_breaks_ties_stably(client):
+    add_transaction(
+        client, date=current_month_day(), amount="90.00", source="First Equal", type="expense"
+    )
+    add_transaction(
+        client, date=current_month_day(), amount="90.00", source="Second Equal", type="expense"
+    )
+
+    # Same amount twice: the older row wins, on every reload.
+    assert "First Equal" in insights_panel(client.get("/").data)
+    assert "First Equal" in insights_panel(client.get("/").data)
+
+
+def test_insights_only_count_expenses_not_income(client):
+    add_transaction(client, date=current_month_day(), amount="9000.00", type="income")
+    add_transaction(client, date=current_month_day(), amount="40.00", type="expense")
+
+    panel = insights_panel(client.get("/").data)
+
+    assert "9000.00" not in panel
+    assert "40.00" in panel
+
+
+def test_insights_are_scoped_to_the_logged_in_user(client):
+    add_transaction(
+        client, date=current_month_day(), amount="777.00", source="Alice Only", type="expense"
+    )
+    client.post("/logout")
+
+    register(client, username="bob")
+    panel = insights_panel(client.get("/").data)
+
+    assert "777.00" not in panel
+    assert "Alice Only" not in panel
