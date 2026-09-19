@@ -508,6 +508,20 @@ Where "this month" begins and ends now has one definition, `services/analytics.m
 - Raw CSV is never stored. Only the derived rows, a SHA-256 of the upload for the repeated-file warning, and a truncated copy of any line that failed.
 - CSRF, authentication, session cookie flags and account lockout are unchanged, and the new routes are covered by the same tests as the old ones.
 
+### Demo Data
+
+`scripts/seed_demo_data.py` builds a demo account with six months of history — around 195 transactions across every category, budgets sized so one is already over its limit, and two past imports so the history page has something to show.
+
+```bash
+python scripts/seed_demo_data.py   # username: admin, password: Demo12345!
+```
+
+Safe to re-run: it deletes the account and rebuilds it, so a rehearsal and the real thing show identical numbers.
+
+Everything is anchored to calendar months rather than "days ago". The dashboard summary is month-scoped now, so a fixed day offset would land in a different month depending on when the script ran, and could leave the current month looking empty on stage. The current month is filled only as far as today — nothing is dated in the future, which would show up in the transactions list and skew the month-to-date figures.
+
+The amounts are random but seeded, and the three largest one-offs are deliberate: without them the trend line is flat, which is honest about real spending and useless on a slide.
+
 ### What I Learned
 - That a derived value is cheapest when it is not stored: dropping the fingerprint column removed a migration, a backfill, a drift risk between SQL and Python, and the question of what to do when an edited transaction's stored fingerprint goes stale — and cost one indexed query
 - Why a duplicate check belongs in the interface rather than in a unique index: the database cannot tell an accidental double import from two identical coffees, and the one that guesses wrong deletes real data
