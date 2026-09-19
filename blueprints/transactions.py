@@ -125,6 +125,39 @@ def get_spending_by_category(user_id, start, end):
         return []
 
 
+def get_transactions_on_dates(user_id, dates):
+    """Return the user's transactions falling on any of `dates`.
+
+    Duplicate detection compares an upload against what is already stored.
+    Narrowing to the days the file actually covers keeps that a single indexed
+    lookup (transactions_user_date_idx) rather than a read of the account's
+    whole history.
+    """
+    if not dates:
+        return []
+
+    try:
+        with get_connection() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                SELECT date, source, amount, type, category
+                FROM transactions
+                WHERE user_id = %s AND date = ANY(%s)
+                """,
+                (user_id, list(dates))
+            )
+            rows = cursor.fetchall()
+    except psycopg2.Error as e:
+        flash(t("error.database", error=e))
+        return []
+
+    return [
+        {"date": row[0], "source": row[1], "amount": row[2], "type": row[3], "category": row[4]}
+        for row in rows
+    ]
+
+
 def get_expense_stats(user_id, start, end, previous_start):
     """Return this month's expense total and count, plus last month's total.
 

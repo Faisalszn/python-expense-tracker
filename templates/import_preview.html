@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ t("preview.title") }}{% endblock %}
+{% block content %}
+    <header class="page-heading">
+        <div>
+            <h1>{{ t("preview.title") }}</h1>
+            <p>{{ t("preview.subtitle", filename=filename) }}</p>
+        </div>
+        <div class="page-actions">
+            <a class="btn-secondary" href="{{ url_for('imports.upload') }}">{{ t("preview.back") }}</a>
+        </div>
+    </header>
+    <div class="preview-summary">
+        {% for key, count, kind in [('preview.valid', preview.valid_count, 'valid'), ('preview.invalid', preview.invalid_count, 'invalid'), ('preview.duplicates', preview.duplicate_count, 'duplicate')] %}
+            <section class="preview-count preview-{{ kind }}">
+                <h2>{{ t(key) }}</h2>
+                <p>
+                    <bdi>{{ count }}</bdi>
+                </p>
+            </section>
+        {% endfor %}
+    </div>
+    <p class="preview-note">
+        {% if preview.valid_count %}
+            {{ t("preview.ready", count=preview.valid_count) }}
+        {% else %}
+            {{ t("preview.nothing_to_import") }}
+        {% endif %}
+    </p>
+    <div class="table-container">
+        <table class="preview-table">
+            <caption class="sr-only">{{ t("preview.title") }}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">{{ t("preview.th_row") }}</th>
+                    {% for key in ['date','source','amount','type','category'] %}
+                        <th scope="col" class="{{ 'amount' if key == 'amount' }}">{{ t('transactions.th_' ~ key) }}</th>
+                    {% endfor %}
+                    <th scope="col">{{ t("preview.th_status") }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in preview.rows %}
+                    <tr class="preview-row-{{ row.status }}">
+                        <th scope="row">
+                            <bdi>{{ row.number }}</bdi>
+                        </th>
+                        {% for key in ['date','source','amount','type','category'] %}
+                            <td class="{{ 'amount' if key == 'amount' }}">{{ row.values[key] }}</td>
+                        {% endfor %}
+                        <td>
+                            <span class="preview-status status-{{ row.status }}">{{ t("preview.status_" ~ row.status) }}</span>
+                            {% if row.error_key %}<span class="preview-error">{{ t(row.error_key) }}</span>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}
