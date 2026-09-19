@@ -1,6 +1,3 @@
-from datetime import datetime
-from decimal import Decimal, InvalidOperation
-
 import psycopg2
 from flask import Blueprint, flash, redirect, render_template, request, session
 
@@ -8,52 +5,16 @@ from blueprints.auth import login_required
 from constants import CATEGORIES
 from db import get_connection
 from i18n import t
+from services.transaction_rules import TRANSACTION_FIELDS, normalize_and_validate
 
 transactions_bp = Blueprint("transactions", __name__)
 
 
 def validate_transaction_form(form):
     """Validate submitted form data, returning (data, error_key) tuple."""
-    category = form.get("category", "").strip()
-    date = form.get("date", "").strip()
-    source = form.get("source", "").strip()
-    amount_input = form.get("amount", "").strip()
-    transaction_type = form.get("type", "").strip().lower()
-
-    if category not in CATEGORIES:
-        return None, "error.invalid_category"
-
-    if not date:
-        return None, "error.date_required"
-    try:
-        datetime.strptime(date, "%Y-%m-%d")
-    except ValueError:
-        return None, "error.invalid_date_format"
-
-    if not source:
-        return None, "error.source_required"
-    if source.isdigit():
-        return None, "error.source_numeric"
-
-    try:
-        amount = Decimal(amount_input)
-    except InvalidOperation:
-        return None, "error.amount_not_number"
-    if not amount.is_finite():
-        return None, "error.amount_not_number"
-    if amount <= 0:
-        return None, "error.amount_not_positive"
-
-    if transaction_type not in ("income", "expense"):
-        return None, "error.invalid_transaction_type"
-
-    return {
-        "date": date,
-        "source": source,
-        "amount": amount,
-        "type": transaction_type,
-        "category": category,
-    }, None
+    # The rules themselves live in services.transaction_rules so that CSV
+    # import validates transactions exactly the way these forms do.
+    return normalize_and_validate({field: form.get(field, "") for field in TRANSACTION_FIELDS})
 
 
 def get_summary(user_id):
