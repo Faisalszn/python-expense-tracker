@@ -29,7 +29,10 @@ def _migrated_database():
 def _clean_database():
     with db.get_connection() as connection:
         cursor = connection.cursor()
-        cursor.execute("TRUNCATE users, transactions, budgets RESTART IDENTITY CASCADE")
+        cursor.execute(
+            "TRUNCATE users, transactions, budgets, import_batches, import_row_errors "
+            "RESTART IDENTITY CASCADE"
+        )
         connection.commit()
     yield
 
