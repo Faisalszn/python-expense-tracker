@@ -17,22 +17,29 @@ def validate_transaction_form(form):
     return normalize_and_validate({field: form.get(field, "") for field in TRANSACTION_FIELDS})
 
 
-def get_summary(user_id):
+def get_summary(user_id, start, end):
+    """Return (income, spending, net) for [start, end) — one month, typically.
+
+    `net` is that window's income minus its spending, not an account balance:
+    money from outside the window is not part of it.
+    """
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
 
+            # One pass with FILTER rather than a query per type: the row set is
+            # identical, so scanning it twice only doubles the work.
             cursor.execute(
-                "SELECT SUM(amount) FROM transactions WHERE type = 'income' AND user_id = %s",
-                (user_id,)
+                """
+                SELECT
+                    COALESCE(SUM(amount) FILTER (WHERE type = 'income'), 0),
+                    COALESCE(SUM(amount) FILTER (WHERE type = 'expense'), 0)
+                FROM transactions
+                WHERE user_id = %s AND date >= %s AND date < %s
+                """,
+                (user_id, start, end)
             )
-            total_income = cursor.fetchone()[0] or 0
-
-            cursor.execute(
-                "SELECT SUM(amount) FROM transactions WHERE type = 'expense' AND user_id = %s",
-                (user_id,)
-            )
-            total_spending = cursor.fetchone()[0] or 0
+            total_income, total_spending = cursor.fetchone()
     except psycopg2.Error as e:
         flash(t("error.database", error=e))
         total_income = total_spending = 0
@@ -89,7 +96,8 @@ def get_transaction_by_id(transaction_id, user_id):
         return None
 
 
-def get_spending_by_category(user_id):
+def get_spending_by_category(user_id, start, end):
+    """Return (category, total) expense pairs for [start, end), largest first."""
     try:
         with get_connection() as connection:
             cursor = connection.cursor()
@@ -98,11 +106,14 @@ def get_spending_by_category(user_id):
                 """
                 SELECT category, SUM(amount) AS total
                 FROM transactions
-                WHERE type = 'expense' AND user_id = %s
+                WHERE type = 'expense'
+                    AND user_id = %s
+                    AND date >= %s
+                    AND date < %s
                 GROUP BY category
                 ORDER BY total DESC
                 """,
-                (user_id,)
+                (user_id, start, end)
             )
 
             return cursor.fetchall()
@@ -112,6 +123,11 @@ def get_spending_by_category(user_id):
 
 
 def get_monthly_spending(user_id):
+    """Return (YYYY-MM, total) expense pairs across the user's whole history.
+
+    Deliberately not month-scoped: this is the multi-month trend, and the proof
+    that scoping the summary to one month never discards anything.
+    """
     try:
         with get_connection() as connection:
             cursor = connection.cursor()

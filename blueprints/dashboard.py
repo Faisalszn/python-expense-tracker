@@ -8,6 +8,7 @@ from blueprints.transactions import (
     get_summary,
 )
 from i18n import t
+from services.analytics import month_bounds
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -17,8 +18,13 @@ dashboard_bp = Blueprint("dashboard", __name__)
 def home():
     user_id = session["user_id"]
 
-    total_income, total_spending, balance = get_summary(user_id)
-    spending_by_category = get_spending_by_category(user_id)
+    # The headline figures cover the current month only. Earlier months are
+    # never deleted or reset — they stay in the transactions list, the CSV
+    # export, and the multi-month trend below, which is still whole-history.
+    start, end = month_bounds()
+
+    total_income, total_spending, net = get_summary(user_id, start, end)
+    spending_by_category = get_spending_by_category(user_id, start, end)
     monthly_spending = get_monthly_spending(user_id)
     budget_status = get_budget_status(user_id)
 
@@ -32,9 +38,10 @@ def home():
 
     return render_template(
         "index.html",
+        current_month=start.month,
         total_income=total_income,
         total_spending=total_spending,
-        balance=balance,
+        net=net,
         spending_by_category=spending_by_category,
         category_labels=category_labels,
         category_totals=category_totals,

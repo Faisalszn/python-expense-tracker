@@ -9,10 +9,11 @@
         </div>
         <a class="btn-primary" href="{{ url_for('transactions.add') }}">{{ t("nav.add_transaction") }}</a>
     </header>
+    {% set month_name = t('month.' ~ current_month) %}
     <div class="summary-grid">
-        {% for label, value, kind in [('dashboard.total_income', total_income, 'income'), ('dashboard.total_spending',total_spending,'spending'), ('dashboard.balance',balance,'balance')] %}
+        {% for label, value, kind in [('dashboard.month_income', total_income, 'income'), ('dashboard.month_spending',total_spending,'spending'), ('dashboard.month_net',net,'net')] %}
             <section class="summary-card {{ kind }}">
-                <h2>{{ t(label) }}</h2>
+                <h2>{{ t(label, month=month_name) }}</h2>
                 <p>
                     <bdi>{{ "%.2f"|format(value) }}</bdi> <span class="currency">{{ t("ui.currency") }}</span>
                 </p>
@@ -22,7 +23,7 @@
     <div class="analytics-grid">
         <section class="panel analytics-section">
             <h2>{{ t("dashboard.spending_by_category") }}</h2>
-            <p class="section-description">{{ t("ui.all_spending") }}</p>
+            <p class="section-description">{{ t("ui.month_spending_scope", month=month_name) }}</p>
             {% if spending_by_category %}
                 <div class="category-list">
                     {% set largest = category_totals|max %}

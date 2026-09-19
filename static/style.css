@@ -564,7 +564,7 @@ select:user-invalid {
     color: var(--danger);
 }
 
-.summary-card.balance {
+.summary-card.net {
     background: var(--brown-dark);
     color: var(--surface);
 }
