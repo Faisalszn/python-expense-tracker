@@ -4,7 +4,10 @@
     <header class="page-heading">
         <div>
             <h1>{{ t("preview.title") }}</h1>
-            <p>{{ t("preview.subtitle", filename=filename) }}</p>
+            <p>{{ t("preview.subtitle") }}</p>
+            <p class="section-description">
+                <bdi>{{ filename }}</bdi>
+            </p>
         </div>
         <div class="page-actions">
             <a class="btn-secondary" href="{{ url_for('imports.upload') }}">{{ t("preview.back") }}</a>
@@ -12,7 +15,7 @@
     </header>
     {% if previously_imported_at %}
         <p class="preview-warning" role="status">
-            {{ t("preview.already_imported", date=previously_imported_at.strftime('%Y-%m-%d')) }}
+            {{ t("preview.already_imported") }} <bdi>{{ previously_imported_at.strftime('%Y-%m-%d') }}</bdi>
         </p>
     {% endif %}
     <div class="preview-summary">

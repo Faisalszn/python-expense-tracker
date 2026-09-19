@@ -14,7 +14,7 @@ import binascii
 import hashlib
 
 import psycopg2
-from flask import Blueprint, flash, redirect, render_template, request, session
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from psycopg2.extras import execute_values
 
 from blueprints.auth import login_required
@@ -424,7 +424,7 @@ def confirm():
         return preview_page(result, raw_bytes, filename, user_id)
 
     flash(t("success.import_complete", count=len(rows_to_import)))
-    return redirect(f"/transactions/imports/{import_id}")
+    return redirect(url_for("imports.detail", import_id=import_id))
 
 
 @imports_bp.route("/transactions/imports")

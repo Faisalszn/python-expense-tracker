@@ -49,7 +49,7 @@ def listed_files(client):
     if "<tbody>" not in html:
         return []
     body = html[html.index("<tbody>"):html.index("</tbody>")]
-    return re.findall(r'<a href="/transactions/imports/\d+">([^<]+)</a>', body)
+    return re.findall(r'<a href="/transactions/imports/\d+"><bdi>([^<]+)</bdi></a>', body)
 
 
 # --- the list -----------------------------------------------------------------

@@ -29,7 +29,7 @@
                     {% for record in imports %}
                         <tr>
                             <th scope="row" class="source-cell">
-                                <a href="{{ url_for('imports.detail', import_id=record.id) }}">{{ record.filename }}</a>
+                                <a href="{{ url_for('imports.detail', import_id=record.id) }}"><bdi>{{ record.filename }}</bdi></a>
                             </th>
                             <td>
                                 <bdi>{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</bdi>

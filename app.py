@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask
+from flask import Flask, render_template, request, session
 from flask_wtf import CSRFProtect
 
 from blueprints.auth import auth_bp
@@ -48,7 +48,15 @@ def create_app():
     def payload_too_large(error):
         # Werkzeug's own 413 page says nothing a person can act on.
         megabytes = app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
-        return render_upload_form(size_error=megabytes), 413
+
+        # Only the import flow accepts uploads, so only it has somewhere
+        # useful to send the reader back to. Anything else that overruns the
+        # limit gets a plain answer rather than an import form it never asked
+        # for — least of all a logged-out visitor.
+        if request.blueprint == "imports" and "user_id" in session:
+            return render_upload_form(size_error=megabytes), 413
+
+        return render_template("too_large.html", size=megabytes), 413
 
     return app
 

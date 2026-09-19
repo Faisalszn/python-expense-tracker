@@ -4,8 +4,9 @@
     <header class="page-heading">
         <div>
             <h1>{{ t("summary.title") }}</h1>
-            <p>
-                {{ t("summary.subtitle", filename=record.filename, date=record.created_at.strftime('%Y-%m-%d %H:%M')) }}
+            <p>{{ t("summary.subtitle") }}</p>
+            <p class="section-description">
+                <bdi>{{ record.filename }}</bdi> · <bdi>{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</bdi>
             </p>
         </div>
         <div class="page-actions">

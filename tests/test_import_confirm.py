@@ -197,7 +197,7 @@ def test_the_same_file_twice_is_warned_about(client):
 
     body = preview(client, f"{HEADER}\n{ROW_A}", filename="september.csv").data
 
-    assert b"imported this same file" in body
+    assert b"imported this same file before" in body
 
 
 def test_duplicates_import_when_explicitly_chosen(client):
