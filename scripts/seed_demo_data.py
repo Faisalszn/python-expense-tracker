@@ -3,10 +3,10 @@
 Usage:
     python scripts/seed_demo_data.py
 
-Safe to re-run any time, including right before a demo: it deletes any
-existing account with the same username first (transactions, budgets and
-import history all go with it via ON DELETE CASCADE), then rebuilds it, so
-the demo always starts from the same known state.
+Safe to re-run any time, including while the app is running and a browser is
+signed in as the demo user: the account keeps its id and only its data is
+replaced, so a refresh shows the new figures rather than an empty dashboard.
+Re-running also clears any lockout from a mistyped password during rehearsal.
 
 Two things make the result presentable rather than merely present:
 
@@ -271,18 +271,44 @@ def main():
     with get_connection() as connection:
         cursor = connection.cursor()
 
-        cursor.execute("DELETE FROM users WHERE username = %s", (DEMO_USERNAME,))
-
         password_hash = generate_password_hash(DEMO_PASSWORD, method="pbkdf2:sha256")
-        cursor.execute(
-            """
-            INSERT INTO users (username, password_hash, created_at)
-            VALUES (%s, %s, %s)
-            RETURNING id
-            """,
-            (DEMO_USERNAME, password_hash, month_start(today, MONTHS_OF_HISTORY - 1)),
-        )
-        user_id = cursor.fetchone()[0]
+        created_at = month_start(today, MONTHS_OF_HISTORY - 1)
+
+        cursor.execute("SELECT id FROM users WHERE username = %s", (DEMO_USERNAME,))
+        existing = cursor.fetchone()
+
+        if existing:
+            # Keep the same user id rather than deleting the row and letting a
+            # new one be issued. A browser already signed in as the demo user
+            # holds that id in its session: re-seed underneath it and every
+            # page goes blank, which is a poor thing to discover on stage.
+            # Reusing the id means a refresh shows the new data.
+            user_id = existing[0]
+            cursor.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM import_batches WHERE user_id = %s", (user_id,))
+            cursor.execute("DELETE FROM budgets WHERE user_id = %s", (user_id,))
+            cursor.execute(
+                """
+                UPDATE users
+                SET password_hash = %s,
+                    created_at = %s,
+                    language = 'en',
+                    failed_login_attempts = 0,
+                    locked_until = NULL
+                WHERE id = %s
+                """,
+                (password_hash, created_at, user_id),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO users (username, password_hash, created_at)
+                VALUES (%s, %s, %s)
+                RETURNING id
+                """,
+                (DEMO_USERNAME, password_hash, created_at),
+            )
+            user_id = cursor.fetchone()[0]
 
         import_ids = {}
         for record in imports:
